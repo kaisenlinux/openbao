@@ -1,0 +1,22 @@
+---
+draft: true
+sidebar_current: 'docs-platform-k8s-examples-development'
+description: |-
+  Describes how to set up a development Vault
+---
+
+# Development
+
+:::warning
+
+**Important Note:** This chart is not compatible with Helm 2. Please use Helm 3.6+ with this chart.
+
+:::
+
+The below `values.yaml` can be used to set up a single development Vault server.
+
+```yaml
+server:
+  dev:
+    enabled: true
+```

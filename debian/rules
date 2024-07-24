@@ -1,0 +1,40 @@
+#!/usr/bin/make -f
+
+export GOPATH=$(CURDIR)/_build
+export GOBIN=$(CURDIR)/_build/bin
+export GO111MODULE=on
+export CGO_ENABLED=0
+#export NODE_OPTIONS=--openssl-legacy-provider
+
+%:
+	dh $@ --buildsystem=golang --builddirectory=_build
+
+override_dh_auto_clean:
+	rm -rf $(CURDIR)/_build
+
+override_dh_auto_build:
+	#Install the latest yarn version in $GOPATH
+	npm install --global yarn --prefix $(CURDIR)/_build
+	#Building vault...
+	make bootstrap
+	make mysql-database-plugin
+	make mysql-legacy-database-plugin
+	make cassandra-database-plugin
+	make influxdb-database-plugin
+	make postgresql-database-plugin
+	make static-dist
+	make assetcheck
+	make bin
+	
+override_dh_auto_test:
+	go test
+
+override_dh_auto_install:
+	install -p -m 0755 $(CURDIR)/bin/bao $(CURDIR)/debian/openbao/usr/bin
+	install -p -m 0644 $(CURDIR)/debian/openbao.png $(CURDIR)/debian/openbao/usr/share/pixmaps
+	cp -rf $(CURDIR)/debian/etc/* $(CURDIR)/debian/openbao/etc/
+
+override_dh_installsystemd:
+	dh_installsystemd --no-enable --no-start
+
+override_dh_dwz:

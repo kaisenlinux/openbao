@@ -1,0 +1,123 @@
+---
+description: >-
+  The `/sys/policies/` endpoints are used to manage ACL policies
+  in OpenBao.
+---
+
+# `/sys/policies/`
+
+The `/sys/policies` endpoints are used to manage ACL, RGP, and EGP policies in OpenBao.
+
+## List ACL policies
+
+This endpoint lists all configured ACL policies.
+
+| Method | Path                |
+| :----- | :------------------ |
+| `LIST` | `/sys/policies/acl` |
+
+### Sample request
+
+```shell-session
+$ curl \
+    -X LIST --header "X-Vault-Token: ..." \
+    http://127.0.0.1:8200/v1/sys/policies/acl
+```
+
+### Sample response
+
+```json
+{
+  "keys": ["root", "my-policy"]
+}
+```
+
+## Read ACL policy
+
+This endpoint retrieves information about the named ACL policy.
+
+| Method | Path                      |
+| :----- | :------------------------ |
+| `GET`  | `/sys/policies/acl/:name` |
+
+### Parameters
+
+- `name` `(string: <required>)` – Specifies the name of the policy to retrieve.
+  This is specified as part of the request URL.
+
+### Sample request
+
+```shell-session
+$ curl \
+    --header "X-Vault-Token: ..." \
+    http://127.0.0.1:8200/v1/sys/policies/acl/my-policy
+```
+
+### Sample response
+
+```json
+{
+  "name": "deploy",
+  "policy": "path \"secret/foo\" {..."
+}
+```
+
+## Create/Update ACL policy
+
+This endpoint adds a new or updates an existing ACL policy. Once a policy is
+updated, it takes effect immediately to all associated users.
+
+| Method | Path                      |
+| :----- | :------------------------ |
+| `POST`  | `/sys/policies/acl/:name` |
+
+### Parameters
+
+- `name` `(string: <required>)` – Specifies the name of the policy to create.
+  This is specified as part of the request URL.
+
+- `policy` `(string: <required>)` - Specifies the policy document. This can be
+  base64-encoded to avoid string escaping.
+
+### Sample payload
+
+```json
+{
+  "policy": "path \"secret/foo\" {..."
+}
+```
+
+### Sample request
+
+```shell-session
+$ curl \
+    --header "X-Vault-Token: ..." \
+    --request POST \
+    --data @payload.json \
+    http://127.0.0.1:8200/v1/sys/policies/acl/my-policy
+```
+
+## Delete ACL policy
+
+This endpoint deletes the ACL policy with the given name. This will immediately
+affect all users associated with this policy. (A deleted policy set on a token
+acts as an empty policy.)
+
+| Method   | Path                      |
+| :------- | :------------------------ |
+| `DELETE` | `/sys/policies/acl/:name` |
+
+### Parameters
+
+- `name` `(string: <required>)` – Specifies the name of the policy to delete.
+  This is specified as part of the request URL.
+
+### Sample request
+
+```shell-session
+$ curl \
+    --header "X-Vault-Token: ..." \
+    --request DELETE \
+    http://127.0.0.1:8200/v1/sys/policies/acl/my-policy
+```
+

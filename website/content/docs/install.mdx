@@ -1,0 +1,137 @@
+---
+description: |-
+  Download a precompiled binary, compile from source, or use a package.
+---
+
+# Installing OpenBao
+
+There are several options to install OpenBao:
+
+1. Install from a [Package Manager](#package-manager).
+
+1. Use a [precompiled binary](#precompiled-binaries).
+
+1. Install [from source](#compiling-from-source).
+
+1. [Helm for Kubernetes](/docs/platform/k8s/helm)
+
+
+## Package manager
+
+:::info
+
+OpenBao does not yet have a package repository. For now you need to download and
+install packages manually.
+
+:::
+
+OpenBao manages packages for Ubuntu, Debian, Fedora, RHEL, Amazon Linux, and
+other distributions. [Download](/downloads) the appropriate package for your
+operating system and architecture.
+
+## Precompiled binaries
+
+To install the precompiled binary, [download](/downloads) the applicable
+package for your system. OpenBao is packaged as a zip file.
+
+Once the zip is downloaded, unzip the file into your designated directory. The `bao` binary
+inside is all that is necessary to run OpenBao (or `bao.exe` for Windows). No
+additional files are required to run OpenBao.
+
+Copy the binary to your system. If you intend to access it from the
+command-line, ensure that you place the binary somewhere on your `PATH`.
+
+Refer to the [OpenBao Tutorials][learn-vault-dev-server] to start a server, `put`
+your first secret, and use other features of OpenBao.
+
+## Compiling from source
+
+To compile from source, you will need [Go](https://golang.org) installed and
+properly configured (including a `GOPATH` environment variable set), as well as
+a copy of [`git`](https://www.git-scm.com/) in your `PATH`.
+
+Clone the OpenBao repository from GitHub into your `GOPATH`:
+
+```shell-session
+$ mkdir -p $GOPATH/src/github.com/openbao && cd $_
+$ git clone https://github.com/openbao/openbao.git
+$ cd openbao
+```
+
+Bootstrap the project. This will download and compile libraries and tools needed
+to compile OpenBao:
+
+```shell-session
+$ make bootstrap
+```
+
+Build OpenBao for your current system and put the binary in `./bin/` (relative to
+the git checkout). The `make dev` target is just a shortcut that builds `bao`
+for only your local build environment (no cross-compiled targets).
+
+```shell-session
+$ make dev
+```
+
+## Verifying the installation
+
+To verify OpenBao is installed, run `bao -h` on your system. You should
+see the help output. If you are executing it from the command line, ensure it is
+on your `PATH` to avoid receiving an error that OpenBao is not found.
+
+```shell-session
+$ bao -h
+```
+
+## Post-installation hardening
+
+After installing OpenBao, you may want to take additional steps to secure it
+against leaking your secrets. OpenBao normally does this very well, but there
+is an operating system feature that undermines OpenBao's protection. This is
+[memory paging (aka swap)](https://en.wikipedia.org/wiki/Memory_paging). To
+provide extra security, you will want to make sure that your OS has swap
+disabled or that its swap space is encrypted.
+
+### Linux
+
+The example systemd service file provided with the OpenBao source code comes
+configured to disable swap for the OpenBao process. To verify that swap is
+disabled, run `systemctl cat openbao` and check for the line `MemorySwapMax=0`.
+Alternatively, to allow the openbao process to swap out, make sure that line is
+deleted.
+
+If you are not using systemd, you can achieve the same effect by setting the 
+cgroupv2 value `memory.swap.max` to `0` using your tool of choice. You can
+disable swap for the entire OS by running `swapoff` (this is not recommended).
+Encrypting swap space in Linux is possible, but as usual, there are many
+options, and a guide is outside the scope of these docs. Consult your distro's
+documentation.
+
+### BSDs and other Unix-like
+
+It is recommended to confirm that swap is encrypted. This can be done on all the
+major BSDs.
+ * [FreeBSD guide to encrypted swap](https://docs.freebsd.org/en/books/handbook/disks/#swap-encrypting)
+ * [NetBSD guide to encrypted swap](https://netbsd.org/docs/guide/en/netbsd.html#chap-cgd-swap-encryption)
+ * [OpenBSD info on encrypted swap (enabled by default)](https://man.openbsd.org/sysctl.2#VM_SWAPENCRYPT~2)
+
+### Windows
+
+You can check if your swap space is encrypted by opening Powershell and running:
+```shell-session
+> fsutil behavior query encryptpagingfile
+```
+If the value is 0 (that is, `DISABLED`), you are recommended to enable swap
+encryption by running:
+```shell-session
+> fsutil behavior set encryptpagingfile 1
+```
+Then reboot.
+
+### Docker
+
+When running the Docker image, include the flag `--memory-swappiness=0`.
+
+### macOS
+
+[The swap space on macOS is always encrypted](https://support.apple.com/guide/mac-help/what-is-secure-virtual-memory-on-mac-mh11852/mac).

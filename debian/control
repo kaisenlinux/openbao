@@ -1,0 +1,23 @@
+Source: openbao
+Section: admin
+Priority: optional
+Maintainer: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
+Build-Depends: debhelper-compat (= 13),
+	       dh-golang,
+	       golang-go (>= 1.22.5),
+	       golang-golang-x-tools,
+	       golang-github-enumer,
+	       gox (>= 1.0.1-1kaisen),
+	       npm,
+	       nodejs (<< 21), nodejs (>= 20),
+Standards-Version: 4.7.0
+Homepage: https://openbao.org
+Vcs-Browser: https://gitlab.com/kaisenlinux/packages/openbao
+Vcs-Git: https://gitlab.com/kaisenlinux/packages/openbao.git
+Rules-Requires-Root: no
+XS-Go-Import-Path: github.com/openbao/openbao
+
+Package: openbao
+Architecture: amd64 arm64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: OpenBao exists to provide a software solution to manage, store, and distribute sensitive data including secrets, certificates, and keys.

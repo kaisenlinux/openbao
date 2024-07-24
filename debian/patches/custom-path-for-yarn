@@ -1,0 +1,39 @@
+Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
+
+--- openbao-2.0.0.orig/Makefile
++++ openbao-2.0.0/Makefile
+@@ -203,15 +203,15 @@ static-assets-dir:
+ 
+ install-ui-dependencies:
+ 	@echo "--> Installing JavaScript assets"
+-	@cd ui && yarn
++	@cd ui && $(CURDIR)/_build/lib/node_modules/yarn/bin/yarn
+ 
+ test-ember: install-ui-dependencies
+ 	@echo "--> Running ember tests"
+-	@cd ui && yarn run test:oss
++	@cd ui && $(CURDIR)/_build/lib/node_modules/yarn/bin/yarn run test:oss
+ 
+ test-ember-enos: install-ui-dependencies
+ 	@echo "--> Running ember tests with a real backend"
+-	@cd ui && yarn run test:enos
++	@cd ui && $(CURDIR)/_build/lib/node_modules/yarn/bin/yarn run test:enos
+ 
+ check-openbao-in-path:
+ 	@OPENBAO_BIN=$$(command -v bao) || { echo "bao command not found"; exit 1; }; \
+@@ -221,13 +221,13 @@ check-openbao-in-path:
+ ember-dist: install-ui-dependencies
+ 	@cd ui && npm rebuild node-sass
+ 	@echo "--> Building Ember application"
+-	@cd ui && yarn run build
++	@cd ui && $(CURDIR)/_build/lib/node_modules/yarn/bin/yarn run build
+ 	@rm -rf ui/if-you-need-to-delete-this-open-an-issue-async-disk-cache
+ 
+ ember-dist-dev: install-ui-dependencies
+ 	@cd ui && npm rebuild node-sass
+ 	@echo "--> Building Ember application"
+-	@cd ui && yarn run build:dev
++	@cd ui && $(CURDIR)/_build/lib/node_modules/yarn/bin/yarn run build:dev
+ 
+ static-dist: ember-dist
+ static-dist-dev: ember-dist-dev

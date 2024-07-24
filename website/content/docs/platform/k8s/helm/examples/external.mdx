@@ -1,0 +1,22 @@
+---
+draft: true
+sidebar_current: 'docs-platform-k8s-examples-external'
+description: |-
+  Describes how to set up an external Vault
+---
+
+# External Vault
+
+:::warning
+
+**Important Note:** This chart is not compatible with Helm 2. Please use Helm 3.6+ with this chart.
+
+:::
+
+The below `values.yaml` can be used to set up an external vault server or
+cluster.
+
+```yaml
+injector:
+  externalVaultAddr: 'http://external-vault:8200'
+```
