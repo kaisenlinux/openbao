@@ -1,4 +1,4 @@
-module github.com/openbao/openbao/sdk
+module github.com/openbao/openbao/sdk/v2
 
 // The Go version directive for the sdk package should normally only be updated when
 // code in the sdk package requires a newer Go version to build.  It should not
@@ -9,7 +9,7 @@ go 1.22.1
 
 toolchain go1.22.5
 
-replace github.com/openbao/openbao/api => ../api
+replace github.com/openbao/openbao/api/v2 => ../api
 
 require (
 	github.com/armon/go-metrics v0.4.1
@@ -47,14 +47,14 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/openbao/go-kms-wrapping/entropy/v2 v2.1.0
 	github.com/openbao/go-kms-wrapping/v2 v2.1.0
-	github.com/openbao/openbao/api v0.0.0-20231222185543-009633ab13d1
+	github.com/openbao/openbao/api/v2 v2.0.0-00010101000000-000000000000
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/ryanuber/go-glob v1.0.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/atomic v1.9.0
-	golang.org/x/crypto v0.21.0
-	golang.org/x/net v0.22.0
-	golang.org/x/text v0.14.0
+	golang.org/x/crypto v0.29.0
+	golang.org/x/net v0.31.0
+	golang.org/x/text v0.20.0
 	google.golang.org/grpc v1.62.1
 	google.golang.org/protobuf v1.33.0
 )
@@ -70,7 +70,7 @@ require (
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/frankban/quicktest v1.11.3 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.1 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.1 // indirect
+	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/hashicorp/go-rootcerts v1.0.2 // indirect
 	github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87 // indirect
@@ -94,15 +94,14 @@ require (
 	github.com/rogpeppe/go-internal v1.8.1 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	golang.org/x/mod v0.16.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/term v0.18.0 // indirect
+	golang.org/x/mod v0.17.0 // indirect
+	golang.org/x/sync v0.9.0 // indirect
+	golang.org/x/sys v0.27.0 // indirect
+	golang.org/x/term v0.26.0 // indirect
 	golang.org/x/time v0.0.0-20220411224347-583f2d630306 // indirect
-	golang.org/x/tools v0.19.0 // indirect
+	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240304212257-790db918fca8 // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/v3 v3.4.0 // indirect
 )
-
-retract [v0.1.8, v0.11.0]

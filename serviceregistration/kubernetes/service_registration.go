@@ -5,23 +5,22 @@ package kubernetes
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"sync"
 
 	"github.com/hashicorp/go-hclog"
-	"github.com/openbao/openbao/api"
+	"github.com/openbao/openbao/api/v2"
 	sr "github.com/openbao/openbao/serviceregistration"
 	"github.com/openbao/openbao/serviceregistration/kubernetes/client"
 )
 
 const (
 	// Labels are placed in a pod's metadata.
-	labelVaultVersion = "vault-version"
-	labelActive       = "vault-active"
-	labelSealed       = "vault-sealed"
-	labelPerfStandby  = "vault-perf-standby"
-	labelInitialized  = "vault-initialized"
+	labelVaultVersion = "openbao-version"
+	labelActive       = "openbao-active"
+	labelSealed       = "openbao-sealed"
+	labelPerfStandby  = "openbao-perf-standby"
+	labelInitialized  = "openbao-initialized"
 
 	// This is the path to where these labels are applied.
 	pathToLabels = "/metadata/labels/"
@@ -111,7 +110,7 @@ func getRequiredField(logger hclog.Logger, config map[string]string, envVar, con
 	value := ""
 	switch {
 	case api.ReadBaoVariable(envVar) != "":
-		value = os.Getenv(envVar)
+		value = api.ReadBaoVariable(envVar)
 	case config[configParam] != "":
 		value = config[configParam]
 	default:

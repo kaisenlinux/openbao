@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 Build-Depends: debhelper-compat (= 13),
 	       dh-golang,
-	       golang-go (>= 1.22.5),
+	       golang-go (>= 1.22.9),
 	       golang-golang-x-tools,
 	       golang-github-enumer,
 	       gox (>= 1.0.1-1kaisen),

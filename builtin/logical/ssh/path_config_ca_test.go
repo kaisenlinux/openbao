@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/openbao/openbao/sdk/logical"
+	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
 func TestSSH_ConfigCAStorageUpgrade(t *testing.T) {
@@ -201,7 +201,8 @@ func createDeleteHelper(t *testing.T, b logical.Backend, config *logical.Backend
 	}
 
 	issueOptions := map[string]interface{}{
-		"public_key": testCAPublicKeyEd25519,
+		"public_key":       testCAPublicKeyEd25519,
+		"valid_principals": "toor",
 	}
 	issueReq := &logical.Request{
 		Path:      "sign/ca-issuance",

@@ -37,7 +37,7 @@ import (
 	wrapping "github.com/openbao/go-kms-wrapping/v2"
 	aeadwrapper "github.com/openbao/go-kms-wrapping/wrappers/aead/v2"
 	"github.com/openbao/go-kms-wrapping/wrappers/awskms/v2"
-	"github.com/openbao/openbao/api"
+	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/audit"
 	"github.com/openbao/openbao/command/server"
 	"github.com/openbao/openbao/helper/identity/mfa"
@@ -46,14 +46,14 @@ import (
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/osutil"
 	"github.com/openbao/openbao/physical/raft"
-	"github.com/openbao/openbao/sdk/helper/certutil"
-	"github.com/openbao/openbao/sdk/helper/consts"
-	"github.com/openbao/openbao/sdk/helper/jsonutil"
-	"github.com/openbao/openbao/sdk/helper/logging"
-	"github.com/openbao/openbao/sdk/helper/pathmanager"
-	"github.com/openbao/openbao/sdk/helper/shamir"
-	"github.com/openbao/openbao/sdk/logical"
-	"github.com/openbao/openbao/sdk/physical"
+	"github.com/openbao/openbao/sdk/v2/helper/certutil"
+	"github.com/openbao/openbao/sdk/v2/helper/consts"
+	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
+	"github.com/openbao/openbao/sdk/v2/helper/logging"
+	"github.com/openbao/openbao/sdk/v2/helper/pathmanager"
+	"github.com/openbao/openbao/sdk/v2/helper/shamir"
+	"github.com/openbao/openbao/sdk/v2/logical"
+	"github.com/openbao/openbao/sdk/v2/physical"
 	sr "github.com/openbao/openbao/serviceregistration"
 	"github.com/openbao/openbao/vault/cluster"
 	"github.com/openbao/openbao/vault/quotas"
@@ -558,8 +558,11 @@ type Core struct {
 	raftFollowerStates *raft.FollowerStates
 	// Stop channel for raft TLS rotations
 	raftTLSRotationStopCh chan struct{}
-	// Stores the pending peers we are waiting to give answers
-	pendingRaftPeers *sync.Map
+
+	// Stores the root key for generating challenges for pending peers we are
+	// waiting to give answers. This is constant size unlike the earlier
+	// sync.Map implementation.
+	pendingRaftPeerChallengeKey []byte
 
 	// rawConfig stores the config as-is from the provided server configuration.
 	rawConfig *atomic.Value
@@ -942,6 +945,7 @@ func CreateCore(conf *CoreConfig) (*Core, error) {
 		postUnsealStarted:              new(uint32),
 		raftInfo:                       new(atomic.Value),
 		raftJoinDoneCh:                 make(chan struct{}),
+		pendingRaftPeerChallengeKey:    make([]byte, 32),
 		clusterHeartbeatInterval:       clusterHeartbeatInterval,
 		keyRotateGracePeriod:           new(int64),
 		numExpirationWorkers:           conf.NumExpirationWorkers,
@@ -989,6 +993,12 @@ func CreateCore(conf *CoreConfig) (*Core, error) {
 	atomic.StoreInt64(c.keyRotateGracePeriod, int64(2*time.Minute))
 
 	c.raftInfo.Store((*raftInformation)(nil))
+
+	// Create a random key for raft peer challenges.
+	_, err := io.ReadFull(rand.Reader, c.pendingRaftPeerChallengeKey)
+	if err != nil {
+		return nil, fmt.Errorf("error initializing pending raft peer challenge key: %w", err)
+	}
 
 	switch conf.ClusterCipherSuites {
 	case "tls13", "tls12":
@@ -3646,7 +3656,7 @@ func (c *Core) doResolveRoleLocked(ctx context.Context, mountPoint string, match
 		Data:       data,
 		Storage:    c.router.MatchingStorageByAPIPath(ctx, mountPoint+"login"),
 	})
-	if err != nil || resp.Data["role"] == nil {
+	if err != nil || resp == nil || resp.Data == nil || resp.Data["role"] == nil {
 		return ""
 	}
 
@@ -3689,9 +3699,20 @@ func (c *Core) aliasNameFromLoginRequest(ctx context.Context, req *logical.Reque
 		Data:       req.Data,
 		Storage:    c.router.MatchingStorageByAPIPath(ctx, req.Path),
 	})
-	if err != nil || resp.Auth.Alias == nil {
+
+	// Certain errors (like field validation errors) are returned as
+	// logical.ErrorResponse(...)s, which means Auth will not be set,
+	// only resp.Data["error"]. Surface the errors appropriately.
+	if err != nil || resp == nil {
+		return "", err
+	}
+	if resp.Data != nil && len(resp.Data["error"].(string)) > 0 {
+		return "", errors.New(resp.Data["error"].(string))
+	}
+	if resp.Auth == nil || resp.Auth.Alias == nil {
 		return "", nil
 	}
+
 	return resp.Auth.Alias.Name, nil
 }
 

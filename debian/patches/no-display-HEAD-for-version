@@ -1,13 +1,13 @@
 Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 
---- openbao-2.0.0.orig/version/version_base.go
-+++ openbao-2.0.0/version/version_base.go
+--- openbao-2.0.3.orig/version/version_base.go
++++ openbao-2.0.3/version/version_base.go
 @@ -19,7 +19,7 @@ var (
  	CgoEnabled bool
  
  	// Filled by Goreleaser
 -	fullVersion                   = "2.0.0-HEAD"
-+	fullVersion                   = "2.0.0"
++	fullVersion                   = "2.0.3"
  	Version, VersionPrerelease, _ = strings.Cut(strings.TrimSpace(fullVersion), "-")
  	VersionMetadata               = ""
  )

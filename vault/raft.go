@@ -24,10 +24,10 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/mitchellh/mapstructure"
 	wrapping "github.com/openbao/go-kms-wrapping/v2"
-	"github.com/openbao/openbao/api"
+	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/physical/raft"
-	"github.com/openbao/openbao/sdk/helper/jsonutil"
-	"github.com/openbao/openbao/sdk/logical"
+	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
+	"github.com/openbao/openbao/sdk/v2/logical"
 	"github.com/openbao/openbao/vault/seal"
 	"golang.org/x/net/http2"
 )
@@ -191,8 +191,6 @@ func (c *Core) setupRaftActiveNode(ctx context.Context) error {
 
 	raftBackend.SetupAutopilot(c.activeContext, autopilotConfig, c.raftFollowerStates, disableAutopilot)
 
-	c.pendingRaftPeers = &sync.Map{}
-
 	// Reload the raft TLS keys to ensure we are using the latest version.
 	if err := c.checkRaftTLSKeyUpgrades(ctx); err != nil {
 		return err
@@ -213,7 +211,6 @@ func (c *Core) stopRaftActiveNode() {
 		raftBackend.StopAutopilot()
 	}
 
-	c.pendingRaftPeers = nil
 	c.stopPeriodicRaftTLSRotate()
 }
 

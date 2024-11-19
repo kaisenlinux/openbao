@@ -18,8 +18,8 @@ import (
 	"github.com/openbao/openbao/helper/identity/mfa"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/helper/storagepacker"
-	"github.com/openbao/openbao/sdk/framework"
-	"github.com/openbao/openbao/sdk/logical"
+	"github.com/openbao/openbao/sdk/v2/framework"
+	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
 func entityPathFields() map[string]*framework.FieldSchema {
@@ -329,7 +329,7 @@ func (i *IdentityStore) handleEntityUpdateCommon() framework.OperationFunc {
 		// Get the name
 		entityName := d.Get("name").(string)
 		if entityName != "" {
-			entityByName, err := i.MemDBEntityByName(ctx, entityName, false)
+			entityByName, err := i.MemDBEntityByName(ctx, entityName, true)
 			if err != nil {
 				return nil, err
 			}

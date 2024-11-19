@@ -36,7 +36,7 @@ import (
 
 	"github.com/openbao/openbao/helper/testhelpers"
 
-	"github.com/openbao/openbao/sdk/helper/testhelpers/schema"
+	"github.com/openbao/openbao/sdk/v2/helper/testhelpers/schema"
 
 	"github.com/stretchr/testify/require"
 
@@ -45,13 +45,13 @@ import (
 	"github.com/go-test/deep"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
 	"github.com/mitchellh/mapstructure"
-	"github.com/openbao/openbao/api"
-	auth "github.com/openbao/openbao/api/auth/userpass"
+	auth "github.com/openbao/openbao/api/auth/userpass/v2"
+	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/builtin/credential/userpass"
 	logicaltest "github.com/openbao/openbao/helper/testhelpers/logical"
 	vaulthttp "github.com/openbao/openbao/http"
-	"github.com/openbao/openbao/sdk/helper/certutil"
-	"github.com/openbao/openbao/sdk/logical"
+	"github.com/openbao/openbao/sdk/v2/helper/certutil"
+	"github.com/openbao/openbao/sdk/v2/logical"
 	"github.com/openbao/openbao/vault"
 	"golang.org/x/net/idna"
 )
@@ -5134,6 +5134,28 @@ func TestRootWithExistingKey(t *testing.T) {
 	require.Contains(t, resp.Data["keys"], string(myIssuerId1.(issuerID)))
 	require.Contains(t, resp.Data["keys"], string(myIssuerId2.(issuerID)))
 	require.Contains(t, resp.Data["keys"], string(myIssuerId3.(issuerID)))
+}
+
+func TestRootWithExistingEd25519Key(t *testing.T) {
+	t.Parallel()
+	b, s := CreateBackendWithStorage(t)
+	var err error
+
+	// Create an Ed25519 issuer.
+	resp, err := CBWrite(b, s, "issuers/generate/root/internal", map[string]interface{}{
+		"common_name": "Root R1",
+		"key_type":    "ed25519",
+	})
+	schema.ValidateResponse(t, schema.GetResponseSchema(t, b.Route("issuers/generate/root/internal"), logical.UpdateOperation), resp, true)
+	require.NoError(t, err)
+
+	// Then, reusing the key should succeed.
+	resp, err = CBWrite(b, s, "root/generate/existing", map[string]interface{}{
+		"common_name": "Root R2",
+		"key_ref":     "default",
+	})
+	schema.ValidateResponse(t, schema.GetResponseSchema(t, b.Route("issuers/generate/root/existing"), logical.UpdateOperation), resp, true)
+	require.NoError(t, err)
 }
 
 func TestIntermediateWithExistingKey(t *testing.T) {

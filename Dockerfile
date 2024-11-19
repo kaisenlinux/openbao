@@ -35,6 +35,8 @@ RUN apk add --no-cache libcap su-exec dumb-init tzdata
 
 COPY $BIN_NAME /bin/
 
+RUN ln -s /bin/${BIN_NAME} /bin/vault
+
 # /vault/logs is made available to use as a location to store audit logs, if
 # desired; /vault/file is made available to use as a location with the file
 # storage backend, if desired; the server will be started with /vault/config as
@@ -71,7 +73,7 @@ CMD ["server", "-dev"]
 
 
 #### UBI DOCKERFILE ####
-FROM registry.access.redhat.com/ubi9-minimal:9.4 as ubi
+FROM registry.access.redhat.com/ubi9-minimal:9.5 as ubi
 
 ARG BIN_NAME
 # PRODUCT_VERSION is the version built dist/$TARGETOS/$TARGETARCH/$BIN_NAME,
@@ -110,6 +112,8 @@ RUN groupadd --gid 1000 openbao && \
 # Copy in the new OpenBao from CRT pipeline, rather than fetching it from our
 # public releases.
 COPY $BIN_NAME /bin/
+
+RUN ln -s /bin/${BIN_NAME} /bin/vault
 
 # /vault/logs is made available to use as a location to store audit logs, if
 # desired; /vault/file is made available to use as a location with the file

@@ -18,7 +18,7 @@ RUN make bootstrap \
 
 # Docker Image
 
-FROM alpine:3.19
+FROM alpine:3.20
 
 # Create an openbao user and group first so the IDs get set the same way,
 # even as the rest of this may change over time.
@@ -30,6 +30,7 @@ RUN set -eux; \
     apk add --no-cache ca-certificates libcap su-exec dumb-init tzdata
 
 COPY --from=builder /go/src/github.com/openbao/openbao/bin/bao /bin/bao
+RUN ln -s /bin/bao /bin/vault
 
 # /openbao/logs is made available to use as a location to store audit logs, if
 # desired; /openbao/file is made available to use as a location with the file

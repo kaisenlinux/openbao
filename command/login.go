@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/openbao/openbao/api"
+	"github.com/openbao/openbao/api/v2"
 	"github.com/posener/complete"
 )
 
@@ -300,7 +300,7 @@ func (c *LoginCommand) Run(args []string) int {
 
 	if !c.flagNoStore {
 		// Grab the token helper so we can store
-		tokenHelper, err := c.TokenHelper()
+		tokenHelper, err := c.TokenHelper(client.Address())
 		if err != nil {
 			c.UI.Error(wrapAtLength(fmt.Sprintf(
 				"Error initializing token helper. Please verify that the token "+
@@ -343,7 +343,7 @@ func (c *LoginCommand) Run(args []string) int {
 		c.UI.Output(wrapAtLength(
 			"Success! You are now authenticated. The token information displayed "+
 				"below is already stored in the token helper. You do NOT need to run "+
-				"\"vault login\" again. Future Vault requests will automatically use "+
+				"\"bao login\" again. Future OpenBao requests will automatically use "+
 				"this token.") + "\n")
 	}
 

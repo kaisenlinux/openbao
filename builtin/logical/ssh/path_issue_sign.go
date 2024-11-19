@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-secure-stdlib/parseutil"
-	"github.com/openbao/openbao/sdk/framework"
-	"github.com/openbao/openbao/sdk/helper/certutil"
-	"github.com/openbao/openbao/sdk/helper/strutil"
-	"github.com/openbao/openbao/sdk/logical"
+	"github.com/openbao/openbao/sdk/v2/framework"
+	"github.com/openbao/openbao/sdk/v2/helper/certutil"
+	"github.com/openbao/openbao/sdk/v2/helper/strutil"
+	"github.com/openbao/openbao/sdk/v2/logical"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -191,6 +191,10 @@ func (b *backend) calculateValidPrincipals(data *framework.FieldData, req *logic
 
 	switch {
 	case len(parsedPrincipals) == 0:
+		if !role.AllowEmptyPrincipals && principalsAllowedByRole != "*" {
+			return nil, fmt.Errorf("refusing to issue unsafe, globally-valid certificate with no principals specified; set valid_principals or default_user")
+		}
+
 		// There is nothing to process
 		return nil, nil
 	case len(allowedPrincipals) == 0:
