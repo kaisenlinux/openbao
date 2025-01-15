@@ -1,3 +1,9 @@
+openbao (2.1.0-1kaisen) kaisen-packages; urgency=medium
+
+  * Import the 2.1.0 release
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Wed, 15 Jan 2025 16:07:39 +0200
+
 openbao (2.0.3-1kaisen) kaisen-packages; urgency=medium
 
   * Import the 2.0.3 release

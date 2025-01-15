@@ -107,14 +107,14 @@ vet:
 			echo "Vet found suspicious constructs. Please check the reported constructs"; \
 			echo "and fix them if necessary before submitting the code for reviewal."; \
 		fi
-	@$(GO_CMD) list -f '{{.Dir}}' github.com/openbao/openbao/api/... | grep -v /vendor/ \
+	@$(GO_CMD) list -f '{{.Dir}}' github.com/openbao/openbao/api/v2/... | grep -v /vendor/ \
 		| grep -v '.*github.com/hashicorp/vault$$' \
 		| xargs $(GO_CMD) vet ; if [ $$? -eq 1 ]; then \
 			echo ""; \
 			echo "Vet found suspicious constructs. Please check the reported constructs"; \
 			echo "and fix them if necessary before submitting the code for reviewal."; \
 		fi
-	@$(GO_CMD) list -f '{{.Dir}}' github.com/openbao/openbao/sdk/... | grep -v /vendor/ \
+	@$(GO_CMD) list -f '{{.Dir}}' github.com/openbao/openbao/sdk/v2/... | grep -v /vendor/ \
 		| grep -v '.*github.com/hashicorp/vault$$' \
 		| xargs $(GO_CMD) vet ; if [ $$? -eq 1 ]; then \
 			echo ""; \
@@ -140,16 +140,16 @@ tools/codechecker/.bin/codechecker:
 # the check
 vet-codechecker: bootstrap tools/codechecker/.bin/codechecker prep
 	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) ./... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest
-	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) github.com/openbao/openbao/api/... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest
-	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) github.com/openbao/openbao/sdk/... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest
+	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) github.com/openbao/openbao/api/v2/... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest
+	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) github.com/openbao/openbao/sdk/v2/... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest
 
 # vet-codechecker runs our custom linters on the test functions. All output gets
 # piped to revgrep which will only return an error if new piece of code that is
 # not on main violates the check
 ci-vet-codechecker: ci-bootstrap tools/codechecker/.bin/codechecker prep
 	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) ./... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest origin/main
-	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) github.com/openbao/openbao/api/... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest origin/main
-	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) github.com/openbao/openbao/sdk/... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest origin/main
+	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) github.com/openbao/openbao/api/v2/... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest origin/main
+	@$(GO_CMD) vet -vettool=./tools/codechecker/.bin/codechecker -tags=$(BUILD_TAGS) github.com/openbao/openbao/sdk/v2/... 2>&1 | go run github.com/golangci/revgrep/cmd/revgrep@latest origin/main
 
 # lint runs vet plus a number of other checkers, it is more comprehensive, but louder
 lint:
@@ -159,13 +159,13 @@ lint:
 			echo "Lint found suspicious constructs. Please check the reported constructs"; \
 			echo "and fix them if necessary before submitting the code for reviewal."; \
 		fi
-	@$(GO_CMD) list -f '{{.Dir}}' github.com/openbao/openbao/api/... | grep -v /vendor/ \
+	@$(GO_CMD) list -f '{{.Dir}}' github.com/openbao/openbao/api/v2/... | grep -v /vendor/ \
 		| xargs golangci-lint run; if [ $$? -eq 1 ]; then \
 			echo ""; \
 			echo "Lint found suspicious constructs. Please check the reported constructs"; \
 			echo "and fix them if necessary before submitting the code for reviewal."; \
 		fi
-	@$(GO_CMD) list -f '{{.Dir}}' github.com/openbao/openbao/sdk/... | grep -v /vendor/ \
+	@$(GO_CMD) list -f '{{.Dir}}' github.com/openbao/openbao/sdk/v2/... | grep -v /vendor/ \
 		| xargs golangci-lint run; if [ $$? -eq 1 ]; then \
 			echo ""; \
 			echo "Lint found suspicious constructs. Please check the reported constructs"; \
@@ -186,8 +186,8 @@ ci-lint:
 prep:
 	@sh -c "'$(CURDIR)/scripts/goversioncheck.sh' '$(GO_VERSION_MIN)'"
 	@GOARCH= GOOS= $(GO_CMD) generate $$($(GO_CMD) list ./... | grep -v /vendor/)
-	@GOARCH= GOOS= $(GO_CMD) generate $$($(GO_CMD) list github.com/openbao/openbao/api/... | grep -v /vendor/)
-	@GOARCH= GOOS= $(GO_CMD) generate $$($(GO_CMD) list github.com/openbao/openbao/sdk/... | grep -v /vendor/)
+	@GOARCH= GOOS= $(GO_CMD) generate $$($(GO_CMD) list github.com/openbao/openbao/api/v2/... | grep -v /vendor/)
+	@GOARCH= GOOS= $(GO_CMD) generate $$($(GO_CMD) list github.com/openbao/openbao/sdk/v2/... | grep -v /vendor/)
 	@if [ -d .git/hooks ]; then cp .hooks/* .git/hooks/; fi
 
 # bootstrap the build by downloading additional tools that may be used by devs
@@ -250,8 +250,8 @@ proto: bootstrap
 	protoc --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative sdk/helper/pluginutil/*.proto
 
 	# No additional sed expressions should be added to this list. Going forward
-	# we should just use the variable names choosen by protobuf. These are left
-	# here for backwards compatability, namely for SDK compilation.
+	# we should just use the variable names chosen by protobuf. These are left
+	# here for backwards compatibility, namely for SDK compilation.
 	$(SED) -i -e 's/Id/ID/' -e 's/SPDX-License-IDentifier/SPDX-License-Identifier/' vault/request_forwarding_service.pb.go
 	$(SED) -i -e 's/Idp/IDP/' -e 's/Url/URL/' -e 's/Id/ID/' -e 's/IDentity/Identity/' -e 's/EntityId/EntityID/' -e 's/Api/API/' -e 's/Qr/QR/' -e 's/Totp/TOTP/' -e 's/Mfa/MFA/' -e 's/Pingid/PingID/' -e 's/namespaceId/namespaceID/' -e 's/Ttl/TTL/' -e 's/BoundCidrs/BoundCIDRs/' -e 's/SPDX-License-IDentifier/SPDX-License-Identifier/' helper/identity/types.pb.go helper/identity/mfa/types.pb.go helper/storagepacker/types.pb.go sdk/plugin/pb/backend.pb.go sdk/logical/identity.pb.go
 
@@ -320,8 +320,8 @@ openapi: dev
 .PHONY: vulncheck
 vulncheck:
 	$(GO_CMD) run golang.org/x/vuln/cmd/govulncheck@latest -show verbose ./...
-	$(GO_CMD) run golang.org/x/vuln/cmd/govulncheck@latest -show verbose github.com/openbao/openbao/api/...
-	$(GO_CMD) run golang.org/x/vuln/cmd/govulncheck@latest -show verbose github.com/openbao/openbao/sdk/...
+	$(GO_CMD) run golang.org/x/vuln/cmd/govulncheck@latest -show verbose github.com/openbao/openbao/api/v2/...
+	$(GO_CMD) run golang.org/x/vuln/cmd/govulncheck@latest -show verbose github.com/openbao/openbao/sdk/v2/...
 
 .PHONY: tidy-all
 tidy-all:
@@ -365,6 +365,4 @@ dev-gorelease:
 goreleaser-check:
 	@$(SED) 's/REPLACE_WITH_RELEASE_GOOS/linux/g' $(CURDIR)/.goreleaser-template.yaml > $(CURDIR)/.goreleaser.yaml
 	@$(SED) -i 's/^#LINUXONLY#//g' $(CURDIR)/.goreleaser.yaml
-	@$(GO_CMD) run github.com/goreleaser/goreleaser/v2@latest check
-	@$(SED) 's/REPLACE_WITH_RELEASE_GOOS/linux/g' $(CURDIR)/.goreleaser-template.yaml > $(CURDIR)/.goreleaser.yaml
 	@$(GO_CMD) run github.com/goreleaser/goreleaser/v2@latest check

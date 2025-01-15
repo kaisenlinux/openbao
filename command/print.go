@@ -6,7 +6,7 @@ package command
 import (
 	"strings"
 
-	"github.com/mitchellh/cli"
+	"github.com/hashicorp/cli"
 	"github.com/posener/complete"
 )
 
@@ -27,7 +27,7 @@ func (c *PrintCommand) Help() string {
 	helpText := `
 Usage: bao print <subcommand>
 
-	This command groups subcommands for interacting with Vault's runtime values.
+	This command groups subcommands for interacting with OpenBao's runtime values.
 
 Subcommands:
 	token    Token currently in use

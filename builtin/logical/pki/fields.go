@@ -143,6 +143,12 @@ be larger than the role max TTL.`,
 		},
 	}
 
+	fields["not_before"] = &framework.FieldSchema{
+		Type: framework.TypeString,
+		Description: `Set the not before field of the certificate with specified date value.
+The value format should be given in UTC format YYYY-MM-ddTHH:MM:SSZ`,
+	}
+
 	fields["not_after"] = &framework.FieldSchema{
 		Type: framework.TypeString,
 		Description: `Set the not after field of the certificate with specified date value.
@@ -274,6 +280,12 @@ See RFC 4519 Section 2.31 'serialNumber' for a description of this field.
 If you want more than one, specify alternative names in the alt_names
 map using OID 2.5.4.5. This has no impact on the final certificate's
 Serial Number field.`,
+	}
+
+	fields["not_before"] = &framework.FieldSchema{
+		Type: framework.TypeString,
+		Description: `Set the not before field of the certificate with specified date value.
+The value format should be given in UTC format YYYY-MM-ddTHH:MM:SSZ`,
 	}
 
 	fields["not_after"] = &framework.FieldSchema{
@@ -447,6 +459,11 @@ and expired certificates, removing them both from the CRL and from storage. The
 CRL will be rotated if this causes any values to be removed.`,
 	}
 
+	fields["tidy_invalid_certs"] = &framework.FieldSchema{
+		Type:        framework.TypeBool,
+		Description: `Set to true to delete all invalid certs from storage.`,
+	}
+
 	fields["tidy_revoked_cert_issuer_associations"] = &framework.FieldSchema{
 		Type: framework.TypeBool,
 		Description: `Set to true to validate issuer associations
@@ -499,9 +516,18 @@ deactivated ACME account is deleted.`,
 		Type: framework.TypeDurationSecond,
 		Description: `The amount of extra time that must have passed
 beyond certificate expiration before it is removed
-from the backend storage and/or revocation list.
+from the backend storage.
 Defaults to 72 hours.`,
 		Default: int(defaultTidyConfig.SafetyBuffer / time.Second), // TypeDurationSecond currently requires defaults to be int
+	}
+
+	fields["revoked_safety_buffer"] = &framework.FieldSchema{
+		Type: framework.TypeDurationSecond,
+		Description: `The amount of extra time that must have passed
+beyond certificate revocation before it is removed
+from the revocation list.
+Defaults to safety_buffer (which defaults to 72 hours).`,
+		Default: nil,
 	}
 
 	fields["issuer_safety_buffer"] = &framework.FieldSchema{

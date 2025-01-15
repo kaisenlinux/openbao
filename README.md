@@ -2,14 +2,19 @@
 
 ----
 
-**Please note**: We take OpenBao's security and our users' trust very seriously. If you believe you have found a security issue in OpenBao, _please responsibly disclose_ by contacting us at [openbao-security@lists.lfedge.org](openbao-security@lists.lfedge.org).
+**Please note**: We take OpenBao's security and our users' trust very seriously. If you believe you have found a security issue in OpenBao, _please responsibly disclose_ by contacting us at [openbao-security@lists.lfedge.org](mailto:openbao-security@lists.lfedge.org).
 
 ----
 
 <!-- -	Website: https://www.openbao.org -->
 - [Mailing List](https://lists.lfedge.org/g/openbao)
 - [GitHub Discussions](https://github.com/openbao/openbao/discussions)
-- [Chat Server](https://chat.lfx.linuxfoundation.org/) -- look for `openbao-` prefixed rooms.
+- [Chat Server](https://chat.lfx.linuxfoundation.org/)
+  - `#openbao-announcements` ([matrix client](https://matrix.to/#/#openbao-announcements:chat.lfx.linuxfoundation.org), [home server](https://chat.lfx.linuxfoundation.org/#/room/#openbao-announcements:chat.lfx.linuxfoundation.org))
+  - `#openbao-development` ([matrix client](https://matrix.to/#/#openbao-development:chat.lfx.linuxfoundation.org), [home server](https://chat.lfx.linuxfoundation.org/#/room/#openbao-development:chat.lfx.linuxfoundation.org))
+  - `#openbao-general` ([matrix client](https://matrix.to/#/#openbao-general:chat.lfx.linuxfoundation.org), [home server](https://chat.lfx.linuxfoundation.org/#/room/#openbao-general:chat.lfx.linuxfoundation.org))
+  - `#openbao-questions` ([matrix client](https://matrix.to/#/#openbao-questions:chat.lfx.linuxfoundation.org), [home server](https://chat.lfx.linuxfoundation.org/#/room/#openbao-questions:chat.lfx.linuxfoundation.org))
+  - `#openbao-random` ([matrix client](https://matrix.to/#/#openbao-random:chat.lfx.linuxfoundation.org), [home server](https://chat.lfx.linuxfoundation.org/#/room/#openbao-random:chat.lfx.linuxfoundation.org))
 
 <p align="center">
   <img width="300" alt="OpenBao Mascot" src="https://raw.githubusercontent.com/openbao/artwork/main/color/openbao-color.svg">
@@ -112,7 +117,7 @@ $ make test TEST=./vault
 ### Importing OpenBao
 
 This repository publishes two libraries that may be imported by other projects:
-`github.com/openbao/openbao/api` and `github.com/openbao/openbao/sdk`.
+`github.com/openbao/openbao/api/v2` and `github.com/openbao/openbao/sdk/v2`.
 
 Note that this repository also contains OpenBao (the product), and as with most Go
 projects, OpenBao uses Go modules to manage its dependencies. The mechanism to do
@@ -166,7 +171,7 @@ An example of how to use it:
 ```go
 import (
   "testing"
-  "github.com/openbao/openbao/sdk/helper/testcluster/docker"
+  "github.com/openbao/openbao/sdk/v2/helper/testcluster/docker"
 )
 
 func Test_Something_With_Docker(t *testing.T) {

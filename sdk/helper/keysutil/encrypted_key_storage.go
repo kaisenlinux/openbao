@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
@@ -96,7 +96,7 @@ func NewEncryptedKeyStorageWrapper(config EncryptedKeyStorageConfig) (*Encrypted
 		size = DefaultCacheSize
 	}
 
-	cache, err := lru.New2Q(size)
+	cache, err := lru.New2Q[string, string](size)
 	if err != nil {
 		return nil, err
 	}
@@ -110,17 +110,25 @@ func NewEncryptedKeyStorageWrapper(config EncryptedKeyStorageConfig) (*Encrypted
 
 type EncryptedKeyStorageWrapper struct {
 	policy *Policy
-	lru    *lru.TwoQueueCache
+	lru    *lru.TwoQueueCache[string, string]
 	prefix string
 }
 
 func (f *EncryptedKeyStorageWrapper) Wrap(s logical.Storage) logical.Storage {
-	return &encryptedKeyStorage{
+	eksw := &encryptedKeyStorage{
 		policy: f.policy,
 		s:      s,
 		prefix: f.prefix,
 		lru:    f.lru,
 	}
+
+	if _, ok := s.(logical.TransactionalStorage); ok {
+		return &transactionalEncryptedKeyStorage{
+			*eksw,
+		}
+	}
+
+	return eksw
 }
 
 // EncryptedKeyStorage implements the logical.Storage interface and ensures the
@@ -128,10 +136,27 @@ func (f *EncryptedKeyStorageWrapper) Wrap(s logical.Storage) logical.Storage {
 type encryptedKeyStorage struct {
 	policy *Policy
 	s      logical.Storage
-	lru    *lru.TwoQueueCache
+	lru    *lru.TwoQueueCache[string, string]
 
 	prefix string
 }
+
+type transactionalEncryptedKeyStorage struct {
+	encryptedKeyStorage
+}
+
+var _ logical.TransactionalStorage = &transactionalEncryptedKeyStorage{}
+
+// While encryptedKeyStorage maintains an LRU cache, this is used to store
+// encryption/decryptions pairs of paths, not contents. There is no move
+// operation, only a delete (+ recreate operation), and we're not caching
+// contents of the entry under that (encrypted) name, so having spurious
+// LRU entries shouldn't be a problem.
+type eksTransaction struct {
+	encryptedKeyStorage
+}
+
+var _ logical.Transaction = &eksTransaction{}
 
 func ensureTailingSlash(path string) string {
 	if !strings.HasSuffix(path, "/") {
@@ -174,7 +199,7 @@ func (s *encryptedKeyStorage) ListPage(ctx context.Context, prefix string, after
 		raw, ok := s.lru.Get(k)
 		if ok {
 			// cache HIT, we can bail early and skip the decode & decrypt operations.
-			decryptedKeys[i] = raw.(string)
+			decryptedKeys[i] = raw
 			continue
 		}
 
@@ -306,4 +331,44 @@ func (s *encryptedKeyStorage) encryptPath(path string) (string, error) {
 	}
 
 	return encPath, nil
+}
+
+func (t *transactionalEncryptedKeyStorage) BeginReadOnlyTx(ctx context.Context) (logical.Transaction, error) {
+	tx, err := t.encryptedKeyStorage.s.(logical.TransactionalStorage).BeginReadOnlyTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &eksTransaction{
+		encryptedKeyStorage{
+			policy: t.encryptedKeyStorage.policy,
+			s:      tx,
+			lru:    t.encryptedKeyStorage.lru,
+			prefix: t.encryptedKeyStorage.prefix,
+		},
+	}, nil
+}
+
+func (t *transactionalEncryptedKeyStorage) BeginTx(ctx context.Context) (logical.Transaction, error) {
+	tx, err := t.encryptedKeyStorage.s.(logical.TransactionalStorage).BeginTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &eksTransaction{
+		encryptedKeyStorage{
+			policy: t.encryptedKeyStorage.policy,
+			s:      tx,
+			lru:    t.encryptedKeyStorage.lru,
+			prefix: t.encryptedKeyStorage.prefix,
+		},
+	}, nil
+}
+
+func (e *eksTransaction) Commit(ctx context.Context) error {
+	return e.encryptedKeyStorage.s.(logical.Transaction).Commit(ctx)
+}
+
+func (e *eksTransaction) Rollback(ctx context.Context) error {
+	return e.encryptedKeyStorage.s.(logical.Transaction).Rollback(ctx)
 }

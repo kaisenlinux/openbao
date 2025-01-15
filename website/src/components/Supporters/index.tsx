@@ -23,11 +23,7 @@ const SupportList: SupportItem[] = [
         description: "Open-source community efforts",
     },
     {
-        title: "IOtech Systems",
-        description: "Open-source community efforts",
-    },
-    {
-        title: "ZEDEDA",
+        title: "IOTech Systems",
         description: "Open-source community efforts",
     },
     {

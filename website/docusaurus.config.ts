@@ -21,7 +21,7 @@ const config: Config = {
   organizationName: "openbao", // Usually your GitHub org/user name.
   projectName: "openbao", // Usually your repo name.
 
-  onBrokenLinks: "warn",
+  onBrokenLinks: "throw",
   onBrokenMarkdownLinks: "warn",
   // ignore broken anchors as most of them are false positives
   onBrokenAnchors: "ignore",
@@ -55,10 +55,24 @@ const config: Config = {
           ],
           path: "content/docs",
         },
-        blog: false,
+        sitemap: {
+          lastmod: 'datetime',
+          changefreq: 'hourly',
+          priority: 0.5,
+          filename: 'sitemap.xml',
+        },
+        blog: {
+          blogTitle: 'OpenBao Blog',
+          blogDescription: 'Official blog of the Bao Evangelism Taskforce (BET)',
+          path: "content/blog",
+        },
         theme: {
           customCss: "./src/css/custom.css",
         },
+		gtag: {
+		  trackingID: "GTM-MWH2V47T",
+		  anonymizeIP: true,
+		},
       } satisfies Preset.Options,
     ],
   ],
@@ -86,14 +100,6 @@ const config: Config = {
   ],
 
   themeConfig: {
-    announcementBar: {
-      id: "support_us",
-      content:
-        'The documentation is still work in progress. If you find any mistakes, please open an <a href="https://github.com/openbao/openbao/issues" target="_blank">issue</a>',
-      backgroundColor: "#ffba00",
-      textColor: "#091E42",
-      isCloseable: false,
-    },
     navbar: {
       title: "OpenBao",
       logo: {
@@ -103,11 +109,21 @@ const config: Config = {
       },
       items: [
         {
+          to: "/blog/",
+          label: "Blog",
+          position: "left",
+        },
+        {
           to: "/docs/",
           label: "Docs",
           position: "left",
         },
         { to: "/api-docs/", label: "API", position: "left" },
+        {
+          to: "/downloads",
+          label: "Downloads",
+          position: "left",
+        },
         {
           type: "dropdown",
           label: "Community",
@@ -118,12 +134,25 @@ const config: Config = {
               href: "https://github.com/openbao/openbao/discussions",
             },
             {
-              label: "Chat Server",
+              label: "Matrix Chat Server",
               href: "https://chat.lfx.linuxfoundation.org/",
             },
             {
-              label: "Wiki",
-              href: "https://wiki.lfedge.org/display/OH/OpenBao+%28Hashicorp+Vault+Fork+effort%29+FAQ",
+              label: "LF Edge Wiki",
+              href: "https://lf-edge.atlassian.net/wiki/spaces/OP/overview",
+            },
+            {
+              label: "Charter",
+              to: "pathname:///assets/OpenBao-Technical-Charter-Final-2024-05-08.pdf",
+              target: "_blank",
+            },
+            {
+              label: "Policies",
+              to: "/docs/policies/",
+            },
+            {
+              label: "Contributing",
+              to: "/docs/contributing/",
             },
           ],
         },
@@ -140,11 +169,13 @@ const config: Config = {
         `For web site terms of use, trademark policy and other project policies please see <a href="https://lfprojects.org">lfprojects.org</a>. <br>`,
         ` OpenBao is a <a href="https://wiki.lfedge.org/display/LE/Stage+1%3A+At+Large">Stage One project</a> at`,
         `<a href="https://www.lfedge.org/"><img src="/img/lfedge-logo.svg" alt="LF Edge Logo" width="90px"></a>.`,
+        `<br><br><a href="/sitemap.xml">Sitemap</a>`,
       ].join(" "),
     },
     prism: {
       theme: prismThemes.github,
       darkTheme: prismThemes.dracula,
+      additionalLanguages: ["hcl"],
     },
   } satisfies Preset.ThemeConfig,
 };

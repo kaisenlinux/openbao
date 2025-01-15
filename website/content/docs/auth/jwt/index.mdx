@@ -45,7 +45,8 @@ using a `bao login`.
 
 ### Redirect URIs
 
-An important part of OIDC role configuration is properly setting redirect URIs. This must be
+Unless you are using `callbackmode=device`,
+an important part of OIDC role configuration is properly setting redirect URIs. This must be
 done both in OpenBao and with the OIDC provider, and these configurations must align. The
 redirect URIs are specified for a role with the `allowed_redirect_uris` parameter. There are
 different redirect URIs to configure the OpenBao UI and CLI flows, so one or both will need to
@@ -53,10 +54,20 @@ be set up depending on the installation.
 
 **CLI**
 
-If you plan to support authentication via `bao login -method=oidc`, a localhost redirect URI
-must be set. This can usually be: `http://localhost:8250/oidc/callback`. Logins via the CLI may
+If you plan to support authentication via `bao login -method=oidc` and
+are not using `callbackmode=device`, a redirect URI with a path ending
+in `oidc/callback` must be set. With the default `callbackmode=client`
+this can usually be `http://localhost:8250/oidc/callback`.
+With `callbackmode=direct` this should be a URI of the form:
+
+`https://{host:port}/v1/auth/{path}/oidc/callback`
+
+where "host:port" is the OpenBao server name and port, and "path" is the path the JWT
+backend is mounted at (e.g. "oidc" or "jwt").
+
+Logins via the CLI may
 specify a different host and/or listening port if needed, and a URI with this host/port must match one
-of the configured redirected URIs. These same "localhost" URIs must be added to the provider as well.
+of the configured redirected URIs. These same URIs must be added to the provider as well.
 
 **OpenBao UI**
 
@@ -68,7 +79,7 @@ The "host:port" must be correct for the OpenBao server, and "path" must match th
 backend is mounted at (e.g. "oidc" or "jwt").
 
 If the [oidc_response_mode](/api-docs/auth/jwt#oidc_response_mode) is set to `form_post`, then
-logging in via the OpenBao UI requires a redirect URI of the form:
+logging in via the OpenBao UI requires a redirect URI of the same form as the direct callback mode:
 
 `https://{host:port}/v1/auth/{path}/oidc/callback`
 
@@ -100,11 +111,18 @@ The callback listener may be customized with the following optional parameters. 
 not required to be set:
 
 - `mount` (default: "oidc")
-- `listenaddress` (default: "localhost")
-- `port` (default: 8250)
-- `callbackhost` (default: "localhost")
-- `callbackmethod` (default: "http")
-- `callbackport` (default: value set for `port`). This value is used in the `redirect_uri`, whereas
+- `callbackmode` (default: "client").  Mode of callback:
+   "client" for connection to a port on the cli client,
+   `direct` for direct connection to the OpenBao server,
+   or "device" for device flow which has no callback.
+- `listenaddress` (default: "localhost").  Only for `client` callback mode.
+- `port` (default: 8250).  Only for `client` callback mode.
+- `callbackhost` (default: the OpenBao's server and port in direct callback mode, else "localhost")
+- `callbackmethod` (default: the method used for the OpenBao server in direct callback mode, else "http").
+   The method to use in an OIDC `redirect_uri`.
+- `callbackport` (default: value set for `port` in client callback mode, otherwise the port of the OpenBao
+   server and an added `/v1/auth/<path>` where `<path>` is from the login -path option)
+   This value is used in the `redirect_uri`, whereas
   `port` is the localhost port that the listener is using. These two may be different in advanced setups.
 
 ### OIDC provider configuration

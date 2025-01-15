@@ -10,8 +10,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/hashicorp/cli"
 	"github.com/hashicorp/go-secure-stdlib/password"
-	"github.com/mitchellh/cli"
 	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/helper/pgpkeys"
 	"github.com/openbao/openbao/sdk/v2/helper/roottoken"
@@ -390,7 +390,7 @@ func (c *OperatorGenerateRootCommand) provide(client *api.Client, key string, ki
 	if !status.Started {
 		c.UI.Error(wrapAtLength(
 			"No root generation is in progress. Start a root generation by " +
-				"running \"vault operator generate-root -init\"."))
+				"running \"bao operator generate-root -init\"."))
 		c.UI.Warn(wrapAtLength(fmt.Sprintf(
 			"If starting root generation using the OTP method and generating "+
 				"your own OTP, the length of the OTP string needs to be %d "+

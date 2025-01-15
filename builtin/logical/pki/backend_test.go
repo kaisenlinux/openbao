@@ -226,6 +226,7 @@ func TestPKI_DeviceCert(t *testing.T) {
 		"allow_bare_domains": true,
 		"allow_subdomains":   true,
 		"not_after":          "9999-12-31T23:59:59Z",
+		"not_before":         "1900-01-01T00:00:00Z",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -252,6 +253,10 @@ func TestPKI_DeviceCert(t *testing.T) {
 	notAfter = cert.NotAfter.Format(time.RFC3339)
 	if notAfter != "9999-12-31T23:59:59Z" {
 		t.Fatal(fmt.Errorf("not after from certificate  is not matching with input parameter"))
+	}
+	notBefore := cert.NotBefore.Format(time.RFC3339)
+	if notBefore != "1900-01-01T00:00:00Z" {
+		t.Fatal(fmt.Errorf("not before from certificate  is not matching with input parameter"))
 	}
 }
 
@@ -3868,6 +3873,7 @@ func TestReadWriteDeleteRoles(t *testing.T) {
 		"allowed_domains_template":           false,
 		"allow_token_displayname":            false,
 		"country":                            []interface{}{},
+		"not_before":                         "",
 		"not_after":                          "",
 		"postal_code":                        []interface{}{},
 		"use_csr_common_name":                true,
@@ -4232,9 +4238,11 @@ func TestBackend_RevokePlusTidy_Intermediate(t *testing.T) {
 		}
 		expectedData := map[string]interface{}{
 			"safety_buffer":                         json.Number("1"),
+			"revoked_safety_buffer":                 json.Number("1"),
 			"issuer_safety_buffer":                  json.Number("31536000"),
 			"tidy_cert_store":                       true,
 			"tidy_revoked_certs":                    true,
+			"tidy_invalid_certs":                    false,
 			"tidy_revoked_cert_issuer_associations": false,
 			"tidy_expired_issuers":                  false,
 			"tidy_move_legacy_ca_bundle":            false,
@@ -6262,6 +6270,7 @@ func TestPKI_EmptyCRLConfigUpgraded(t *testing.T) {
 	require.Equal(t, resp.Data["auto_rebuild_grace_period"], defaultCrlConfig.AutoRebuildGracePeriod)
 	require.Equal(t, resp.Data["enable_delta"], defaultCrlConfig.EnableDelta)
 	require.Equal(t, resp.Data["delta_rebuild_interval"], defaultCrlConfig.DeltaRebuildInterval)
+	require.Equal(t, resp.Data["allow_expired_cert_revocation"], defaultCrlConfig.AllowExpiredCertRevocation)
 }
 
 func TestPKI_ListRevokedCerts(t *testing.T) {

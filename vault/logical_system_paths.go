@@ -583,7 +583,8 @@ func (b *SystemBackend) configPaths() []*framework.Path {
 				},
 				logical.UpdateOperation: &framework.PathOperation{
 					DisplayAttrs: &framework.DisplayAttributes{
-						OperationVerb: "initialize",
+						OperationVerb:   "initialize",
+						OperationSuffix: "system",
 					},
 					Summary:     "Initialize a new OpenBao instance.",
 					Description: "The OpenBao instance must not have been previously initialized. The recovery options, as well as the stored shares option, are only available when using OpenBao HSM.",
@@ -2540,6 +2541,22 @@ func (b *SystemBackend) introspectionPaths() []*framework.Path {
 			},
 			HelpSynopsis:    strings.TrimSpace(sysHelp["internal-inspect-router"][0]),
 			HelpDescription: strings.TrimSpace(sysHelp["internal-inspect-router"][1]),
+		},
+		{
+			Pattern: "internal/inspect/request",
+			DisplayAttrs: &framework.DisplayAttributes{
+				OperationPrefix: "internal",
+				OperationVerb:   "inspect",
+				OperationSuffix: "request",
+			},
+			Operations: map[logical.Operation]framework.OperationHandler{
+				logical.ReadOperation: &framework.PathOperation{
+					Callback: b.pathInternalInspectRequest,
+					Summary:  "Expose all request information to the caller",
+				},
+			},
+			HelpSynopsis:    strings.TrimSpace(sysHelp["internal-inspect-request"][0]),
+			HelpDescription: strings.TrimSpace(sysHelp["internal-inspect-request"][1]),
 		},
 	}
 }

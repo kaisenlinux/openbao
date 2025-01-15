@@ -10,7 +10,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mitchellh/cli"
+	"github.com/hashicorp/cli"
 	"github.com/openbao/openbao/api/v2"
 	"github.com/posener/complete"
 )
@@ -42,7 +42,7 @@ Usage: bao audit enable [options] TYPE [CONFIG K=V...]
 
   This command enables an audit device of TYPE. Additional options for
   configuring the audit device can be specified after the type in the same
-  format as the "vault write" command in key/value pairs.
+  format as the "bao write" command in key/value pairs.
 
   For example, to configure the file audit device to write audit logs at the
   path "/var/log/audit.log":

@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/mitchellh/cli"
+	"github.com/hashicorp/cli"
 	"github.com/openbao/openbao/audit"
 	"github.com/openbao/openbao/builtin/plugin"
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -36,6 +36,7 @@ import (
 	logicalDb "github.com/openbao/openbao/builtin/logical/database"
 	logicalKv "github.com/openbao/openbao/builtin/logical/kv"
 
+	physPostgresql "github.com/openbao/openbao/physical/postgresql"
 	physRaft "github.com/openbao/openbao/physical/raft"
 	physFile "github.com/openbao/openbao/sdk/v2/physical/file"
 	physInmem "github.com/openbao/openbao/sdk/v2/physical/inmem"
@@ -145,13 +146,11 @@ var (
 	}
 
 	physicalBackends = map[string]physical.Factory{
-		"file_transactional":     physFile.NewTransactionalFileBackend,
-		"file":                   physFile.NewFileBackend,
-		"inmem_ha":               physInmem.NewInmemHA,
-		"inmem_transactional_ha": physInmem.NewTransactionalInmemHA,
-		"inmem_transactional":    physInmem.NewTransactionalInmem,
-		"inmem":                  physInmem.NewInmem,
-		"raft":                   physRaft.NewRaftBackend,
+		"file":       physFile.NewFileBackend,
+		"inmem_ha":   physInmem.NewInmemHA,
+		"inmem":      physInmem.NewInmem,
+		"raft":       physRaft.NewRaftBackend,
+		"postgresql": physPostgresql.NewPostgreSQLBackend,
 	}
 
 	serviceRegistrations = map[string]sr.Factory{
@@ -635,21 +634,6 @@ func initCommands(ui, serverCmdUi cli.Ui, runOpts *RunOptions) map[string]cli.Co
 		},
 		"status": func() (cli.Command, error) {
 			return &StatusCommand{
-				BaseCommand: getBaseCommand(),
-			}, nil
-		},
-		"transform": func() (cli.Command, error) {
-			return &TransformCommand{
-				BaseCommand: getBaseCommand(),
-			}, nil
-		},
-		"transform import": func() (cli.Command, error) {
-			return &TransformImportCommand{
-				BaseCommand: getBaseCommand(),
-			}, nil
-		},
-		"transform import-version": func() (cli.Command, error) {
-			return &TransformImportVersionCommand{
 				BaseCommand: getBaseCommand(),
 			}, nil
 		},

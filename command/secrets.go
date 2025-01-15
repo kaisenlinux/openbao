@@ -6,7 +6,7 @@ package command
 import (
 	"strings"
 
-	"github.com/mitchellh/cli"
+	"github.com/hashicorp/cli"
 )
 
 var _ cli.Command = (*SecretsCommand)(nil)
@@ -23,7 +23,7 @@ func (c *SecretsCommand) Help() string {
 	helpText := `
 Usage: bao secrets <subcommand> [options] [args]
 
-  This command groups subcommands for interacting with Vault's secrets engines.
+  This command groups subcommands for interacting with OpenBao's secrets engines.
   Each secret engine behaves differently. Please see the documentation for
   more information.
 

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mitchellh/cli"
+	"github.com/hashicorp/cli"
 	"github.com/posener/complete"
 )
 
@@ -32,7 +32,7 @@ func (c *KVMetadataGetCommand) Help() string {
 	helpText := `
 Usage: bao kv metadata get [options] KEY
 
-  Retrieves the metadata from Vault's key-value store at the given key name. If no
+  Retrieves the metadata from OpenBao's key-value store at the given key name. If no
   key exists with that name, an error is returned.
 
       $ bao kv metadata get -mount=secret foo
