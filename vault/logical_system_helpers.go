@@ -5,10 +5,12 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
@@ -17,7 +19,7 @@ var pathInternalUINamespacesRead = func(b *SystemBackend) framework.OperationFun
 	return func(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 		// Short-circuit here if there's no client token provided
 		if req.ClientToken == "" {
-			return nil, fmt.Errorf("client token empty")
+			return nil, errors.New("client token empty")
 		}
 
 		// Load the ACL policies so we can check for access and filter namespaces
@@ -34,7 +36,23 @@ var pathInternalUINamespacesRead = func(b *SystemBackend) framework.OperationFun
 			return nil, logical.ErrPermissionDenied
 		}
 
-		return logical.ListResponse([]string{""}), nil
+		parent, err := namespace.FromContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		list, err := b.Core.namespaceStore.ListNamespaces(ctx, false, false)
+		if err != nil {
+			return nil, errors.New("failed to list namespaces")
+		}
+
+		var nsList []string
+		for _, entry := range list {
+			relativePath := parent.TrimmedPath(entry.Path)
+			nsList = append(nsList, relativePath)
+		}
+
+		return logical.ListResponse(nsList), nil
 	}
 }
 
@@ -75,7 +93,7 @@ func (b *SystemBackend) tuneMountTTLs(ctx context.Context, path string, me *Moun
 	if err != nil {
 		me.Config.MaxLeaseTTL = origMax
 		me.Config.DefaultLeaseTTL = origDefault
-		return fmt.Errorf("failed to update mount table, rolling back TTL changes")
+		return errors.New("failed to update mount table, rolling back TTL changes")
 	}
 	if b.Core.logger.IsInfo() {
 		b.Core.logger.Info("mount tuning of leases successful", "path", path)

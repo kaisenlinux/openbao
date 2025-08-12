@@ -6,15 +6,15 @@ package connutil
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"errors"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/go-secure-stdlib/parseutil"
-	"github.com/mitchellh/mapstructure"
 	"github.com/openbao/openbao/sdk/v2/database/dbplugin"
 	"github.com/openbao/openbao/sdk/v2/database/helper/dbutil"
 )
@@ -56,7 +56,7 @@ func (c *SQLConnectionProducer) Init(ctx context.Context, conf map[string]interf
 	}
 
 	if len(c.ConnectionURL) == 0 {
-		return nil, fmt.Errorf("connection_url cannot be empty")
+		return nil, errors.New("connection_url cannot be empty")
 	}
 
 	// Do not allow the username or password template pattern to be used as
@@ -66,7 +66,7 @@ func (c *SQLConnectionProducer) Init(ctx context.Context, conf map[string]interf
 		strings.Contains(c.Password, "{{username}}") ||
 		strings.Contains(c.Password, "{{password}}") {
 
-		return nil, fmt.Errorf("username and/or password cannot contain the template variables")
+		return nil, errors.New("username and/or password cannot contain the template variables")
 	}
 
 	// Don't escape special characters for MySQL password

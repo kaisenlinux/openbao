@@ -46,7 +46,7 @@ export default Component.extend({
       const capability = yield this.store.findRecord('capabilities', 'sys/namespaces/');
       this.set('listCapability', capability);
       this.set('canList', true);
-    } catch (e) {
+    } catch {
       // If error out on findRecord call it's because you don't have permissions
       // and therefor don't have permission to manage namespaces
       this.set('canList', false);
@@ -96,7 +96,7 @@ export default Component.extend({
   }),
 
   maybeAddRoot(leaves) {
-    const userRoot = this.auth.authData.userRootNamespace;
+    const userRoot = this.auth?.authData?.userRootNamespace;
     if (userRoot === '') {
       leaves.unshift('');
     }

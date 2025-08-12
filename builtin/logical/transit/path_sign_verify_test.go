@@ -19,7 +19,7 @@ import (
 
 	"golang.org/x/crypto/ed25519"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/openbao/openbao/sdk/v2/helper/keysutil"
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
@@ -1073,7 +1073,8 @@ func testTransit_NoDeadlock_SignVerify(t *testing.T, keyType string, cachingDisa
 	// causing future read locks calls to also block until the write lock is
 	// able to succeed. Setting a timeout should let us return and fail the
 	// test (as the context should be cancelled).
-	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 	_, err = client.Logical().ReadWithContext(ctx, "transit/keys/broken_transit_key")
 	require.NoError(t, err)
 }

@@ -7,16 +7,17 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/hashicorp/errwrap"
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/hcl"
 	"github.com/hashicorp/hcl/hcl/ast"
-	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -155,7 +156,7 @@ func ParseSSHHelperConfig(contents string) (*SSHHelperConfig, error) {
 
 	list, ok := root.Node.(*ast.ObjectList)
 	if !ok {
-		return nil, fmt.Errorf("error parsing config: file doesn't contain a root object")
+		return nil, errors.New("error parsing config: file doesn't contain a root object")
 	}
 
 	valid := []string{

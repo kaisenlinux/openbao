@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MPL-2.0
 
 #### DOCKERHUB DOCKERFILE ####
-FROM alpine:3.20 as default
+FROM alpine:3.21 as default
 
 ARG BIN_NAME
 # NAME and PRODUCT_VERSION are the name of the software in releases.hashicorp.com
@@ -14,7 +14,7 @@ ARG PRODUCT_REVISION
 # Additional metadata labels used by container registries, platforms
 # and certification scanners.
 LABEL name="OpenBao" \
-      maintainer="OpenBao <openbao@lists.lfedge.org>" \
+      maintainer="OpenBao <openbao@lists.openssf.org>" \
       vendor="OpenBao" \
       version=${PRODUCT_VERSION} \
       release=${PRODUCT_REVISION} \
@@ -31,7 +31,8 @@ ENV VERSION=$VERSION
 # Create a non-root user to run the software.
 RUN addgroup ${NAME} && adduser -S -G ${NAME} ${NAME}
 
-RUN apk add --no-cache libcap su-exec dumb-init tzdata
+ARG EXTRA_PACKAGES
+RUN apk add --no-cache libcap su-exec dumb-init tzdata ${EXTRA_PACKAGES}
 
 COPY $BIN_NAME /bin/
 
@@ -67,13 +68,13 @@ ENTRYPOINT ["docker-entrypoint.sh"]
 
 # # By default you'll get a single-node development server that stores everything
 # # in RAM and bootstraps itself. Don't use this configuration for production.
-CMD ["server", "-dev"]
+CMD ["server", "-dev", "-dev-no-store-token"]
 
 
 
 
 #### UBI DOCKERFILE ####
-FROM registry.access.redhat.com/ubi9-minimal:9.5 as ubi
+FROM registry.access.redhat.com/ubi9-minimal:9.6 as ubi
 
 ARG BIN_NAME
 # PRODUCT_VERSION is the version built dist/$TARGETOS/$TARGETARCH/$BIN_NAME,
@@ -84,7 +85,7 @@ ARG PRODUCT_REVISION
 # Additional metadata labels used by container registries, platforms
 # and certification scanners.
 LABEL name="OpenBao" \
-      maintainer="OpenBao <openbao@lists.lfedge.org>" \
+      maintainer="OpenBao <openbao@lists.openssf.org>" \
       vendor="OpenBao" \
       version=${PRODUCT_VERSION} \
       release=${PRODUCT_REVISION} \
@@ -151,4 +152,4 @@ USER openbao
 
 # # By default you'll get a single-node development server that stores everything
 # # in RAM and bootstraps itself. Don't use this configuration for production.
-CMD ["server", "-dev"]
+CMD ["server", "-dev", "-dev-no-store-token"]

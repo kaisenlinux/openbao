@@ -361,7 +361,7 @@ func (p *ParsedCertBundle) Verify() error {
 			return errwrap.Wrapf("could not compare public and private keys: {{err}}", err)
 		}
 		if !equal {
-			return fmt.Errorf("public key of certificate does not match private key")
+			return errors.New("public key of certificate does not match private key")
 		}
 	}
 
@@ -449,6 +449,42 @@ func (p *ParsedCertBundle) SetParsedPrivateKey(privateKey crypto.Signer, private
 	p.PrivateKey = privateKey
 	p.PrivateKeyType = privateKeyType
 	p.PrivateKeyBytes = privateKeyBytes
+}
+
+// GetKeyBits gets the bit length of the underlying key material in the
+// bundle. We use the certificate here to avoid having to access private
+// keys.
+func (p *ParsedCertBundle) GetKeyBits() (int, error) {
+	switch p.Certificate.PublicKeyAlgorithm {
+	case x509.RSA:
+		pub, ok := p.Certificate.PublicKey.(*rsa.PublicKey)
+		if !ok {
+			return -1, fmt.Errorf("unable to cast rsa type certificate's key to rsa.PublicKey: actually of type %T", p.Certificate.PublicKey)
+		}
+		return pub.Size(), nil
+	case x509.ECDSA:
+		pub, ok := p.Certificate.PublicKey.(*ecdsa.PublicKey)
+		if !ok {
+			return -1, fmt.Errorf("unable to cast ec type certificate's key to ecdsa.PublicKey: actually of type %T", p.Certificate.PublicKey)
+		}
+
+		switch pub.Params().Name {
+		case "P-224":
+			return 224, nil
+		case "P-256":
+			return 256, nil
+		case "P-384":
+			return 384, nil
+		case "P-521":
+			return 521, nil
+		default:
+			return -1, fmt.Errorf("unknown curve for ECDSA Public Key: %v", pub.Params().Name)
+		}
+	case x509.Ed25519:
+		return 0, nil
+	default:
+		return -1, fmt.Errorf("unknown public key algorithm on bundle: %v", p.Certificate.PublicKeyAlgorithm)
+	}
 }
 
 func getPKCS8Type(bs []byte) (PrivateKeyType, error) {
@@ -644,7 +680,7 @@ func (p *ParsedCertBundle) GetTLSConfig(usage TLSUsage) (*tls.Config, error) {
 		caPool := x509.NewCertPool()
 		ok := caPool.AppendCertsFromPEM([]byte(certBundle.CAChain[0]))
 		if !ok {
-			return nil, fmt.Errorf("could not append CA certificate")
+			return nil, errors.New("could not append CA certificate")
 		}
 
 		if usage&TLSServer > 0 {

@@ -9,13 +9,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"regexp"
 	"strings"
+	"time"
 
-	"github.com/hashicorp/errwrap"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/hashicorp/go-secure-stdlib/parseutil"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
-	"github.com/mitchellh/mapstructure"
 	"github.com/openbao/openbao/sdk/v2/helper/jsonutil"
 )
 
@@ -33,7 +34,7 @@ type FieldData struct {
 // trying to get data out.  Data not in the schema is not
 // an error at this point, so we don't worry about it.
 func (d *FieldData) Validate() error {
-	for field, value := range d.Raw {
+	for field := range d.Raw {
 
 		schema, ok := d.Schema[field]
 		if !ok {
@@ -46,7 +47,7 @@ func (d *FieldData) Validate() error {
 			TypeKVPairs, TypeCommaIntSlice, TypeHeader, TypeFloat, TypeTime:
 			_, _, err := d.getPrimitive(field, schema)
 			if err != nil {
-				return errwrap.Wrapf(fmt.Sprintf("error converting input %v for field %q: {{err}}", value, field), err)
+				return fmt.Errorf("error converting input for field %q: %w", field, err)
 			}
 		default:
 			return fmt.Errorf("unknown field type %q for field %q", schema.Type, field)
@@ -289,7 +290,7 @@ func (d *FieldData) getPrimitive(k string, schema *FieldSchema) (interface{}, bo
 		config := &mapstructure.DecoderConfig{
 			Result:           &result,
 			WeaklyTypedInput: true,
-			DecodeHook:       mapstructure.StringToSliceHookFunc(","),
+			DecodeHook:       LegacyStringToSliceHookFunc(","),
 		}
 		decoder, err := mapstructure.NewDecoder(config)
 		if err != nil {
@@ -462,5 +463,41 @@ func (d *FieldData) getPrimitive(k string, schema *FieldSchema) (interface{}, bo
 
 	default:
 		panic(fmt.Sprintf("Unknown type: %s", schema.Type))
+	}
+}
+
+func (d *FieldData) GetWithExplicitDefault(field string, defaultValue interface{}) interface{} {
+	assignedValue, ok := d.GetOk(field)
+	if ok {
+		return assignedValue
+	}
+	return defaultValue
+}
+
+func (d *FieldData) GetTimeWithExplicitDefault(field string, defaultValue time.Duration) time.Duration {
+	assignedValue, ok := d.GetOk(field)
+	if ok {
+		return time.Duration(assignedValue.(int)) * time.Second
+	}
+	return defaultValue
+}
+
+// LegacyStringToSliceHookFunc(sep string) is a duplicates the old mapstructure's StringToSliceHookFunc, which supports weak conversion.
+func LegacyStringToSliceHookFunc(sep string) mapstructure.DecodeHookFunc {
+	return func(
+		f reflect.Kind,
+		t reflect.Kind,
+		data interface{},
+	) (interface{}, error) {
+		if f != reflect.String || t != reflect.Slice {
+			return data, nil
+		}
+
+		raw := data.(string)
+		if raw == "" {
+			return []string{}, nil
+		}
+
+		return strings.Split(raw, sep), nil
 	}
 }

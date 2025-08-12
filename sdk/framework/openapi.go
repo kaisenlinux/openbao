@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-viper/mapstructure/v2"
 	log "github.com/hashicorp/go-hclog"
-	"github.com/mitchellh/mapstructure"
 	"github.com/openbao/openbao/sdk/v2/helper/wrapping"
 	"github.com/openbao/openbao/sdk/v2/logical"
 	"golang.org/x/text/cases"
@@ -418,11 +418,28 @@ func documentPath(p *Path, specialPaths *logical.Paths, requestResponsePrefix st
 					In:          "query",
 					Schema:      &OASSchema{Type: "string", Enum: []interface{}{"true"}},
 				})
+			} else if opType == logical.ScanOperation {
+				// Only accepts List (due to the above skipping of ListOperations that also have ReadOperations)
+				op.Parameters = append(op.Parameters, OASParameter{
+					Name:        "scan",
+					Description: "Must be set to `true`",
+					Required:    true,
+					In:          "query",
+					Schema:      &OASSchema{Type: "string", Enum: []interface{}{"true"}},
+				})
 			} else if opType == logical.ReadOperation && operations[logical.ListOperation] != nil {
 				// Accepts both Read and List
 				op.Parameters = append(op.Parameters, OASParameter{
 					Name:        "list",
 					Description: "Return a list if `true`",
+					In:          "query",
+					Schema:      &OASSchema{Type: "string"},
+				})
+			} else if opType == logical.ReadOperation && operations[logical.ScanOperation] != nil {
+				// Accepts both Read and List
+				op.Parameters = append(op.Parameters, OASParameter{
+					Name:        "scan",
+					Description: "Return a recursive list if `true`",
 					In:          "query",
 					Schema:      &OASSchema{Type: "string"},
 				})

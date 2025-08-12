@@ -6,15 +6,16 @@ package cassandra
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/gocql/gocql"
 	"github.com/hashicorp/go-secure-stdlib/parseutil"
 	"github.com/hashicorp/go-secure-stdlib/tlsutil"
-	"github.com/mitchellh/mapstructure"
 	dbplugin "github.com/openbao/openbao/sdk/v2/database/dbplugin/v5"
 	"github.com/openbao/openbao/sdk/v2/database/helper/connutil"
 	"github.com/openbao/openbao/sdk/v2/database/helper/dbutil"
@@ -80,13 +81,13 @@ func (c *cassandraConnectionProducer) Initialize(ctx context.Context, req dbplug
 
 	switch {
 	case len(c.Hosts) == 0:
-		return fmt.Errorf("hosts cannot be empty")
+		return errors.New("hosts cannot be empty")
 	case len(c.Username) == 0:
-		return fmt.Errorf("username cannot be empty")
+		return errors.New("username cannot be empty")
 	case len(c.Password) == 0:
-		return fmt.Errorf("password cannot be empty")
+		return errors.New("password cannot be empty")
 	case len(c.PemJSON) > 0 && len(c.PemBundle) > 0:
-		return fmt.Errorf("cannot specify both pem_json and pem_bundle")
+		return errors.New("cannot specify both pem_json and pem_bundle")
 	}
 
 	var tlsMinVersion uint16 = tls.VersionTLS12

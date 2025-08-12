@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 )
 
 func (c *Sys) ListPolicies() ([]string, error) {
@@ -82,7 +82,7 @@ func (c *Sys) GetPolicyWithContext(ctx context.Context, name string) (string, er
 		return policyRaw.(string), nil
 	}
 
-	return "", fmt.Errorf("no policy found in response")
+	return "", errors.New("no policy found in response")
 }
 
 func (c *Sys) PutPolicy(name, rules string) error {

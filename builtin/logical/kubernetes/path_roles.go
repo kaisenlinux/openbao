@@ -5,11 +5,12 @@ package kubesecrets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
-	"github.com/mitchellh/mapstructure"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/template"
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -350,7 +351,7 @@ func onlyOneSet(vars ...string) bool {
 
 func getRole(ctx context.Context, s logical.Storage, name string) (*roleEntry, error) {
 	if name == "" {
-		return nil, fmt.Errorf("missing role name")
+		return nil, errors.New("missing role name")
 	}
 
 	entry, err := s.Get(ctx, rolesPath+name)

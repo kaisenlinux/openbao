@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"github.com/mitchellh/mapstructure"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/locksutil"
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -46,12 +46,22 @@ version matches the version specified in the cas parameter.`,
 				Description: "The contents of the data map will be stored and returned on read.",
 			},
 		},
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.UpdateOperation: b.upgradeCheck(b.pathDataWrite()),
-			logical.CreateOperation: b.upgradeCheck(b.pathDataWrite()),
-			logical.ReadOperation:   b.upgradeCheck(b.pathDataRead()),
-			logical.DeleteOperation: b.upgradeCheck(b.pathDataDelete()),
-			logical.PatchOperation:  b.upgradeCheck(b.pathDataPatch()),
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.UpdateOperation: &framework.PathOperation{
+				Callback: b.upgradeCheck(b.pathDataWrite()),
+			},
+			logical.CreateOperation: &framework.PathOperation{
+				Callback: b.upgradeCheck(b.pathDataWrite()),
+			},
+			logical.ReadOperation: &framework.PathOperation{
+				Callback: b.upgradeCheck(b.pathDataRead()),
+			},
+			logical.DeleteOperation: &framework.PathOperation{
+				Callback: b.upgradeCheck(b.pathDataDelete()),
+			},
+			logical.PatchOperation: &framework.PathOperation{
+				Callback: b.upgradeCheck(b.pathDataPatch()),
+			},
 		},
 
 		ExistenceCheck: b.dataExistenceCheck(),

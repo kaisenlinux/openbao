@@ -1,3 +1,4 @@
+// Copyright (c) 2024 OpenBao a Series of LF Projects, LLC
 // Copyright (c) HashiCorp, Inc.
 // SPDX-License-Identifier: MPL-2.0
 
@@ -13,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -52,6 +54,9 @@ const (
 	// EnvVaultRaftNonVoter is used to override the non_voter config option, telling Vault to join as a non-voter (i.e. read replica).
 	EnvVaultRaftNonVoter  = "BAO_RAFT_RETRY_JOIN_AS_NON_VOTER"
 	raftNonVoterConfigKey = "retry_join_as_non_voter"
+
+	// NodeNonVoter is a custom node type for non-voters
+	NodeNonVoter = autopilot.NodeType("non-voter")
 )
 
 var getMmapFlags = func(string) int { return 0 }
@@ -155,6 +160,10 @@ type RaftBackend struct {
 	// autopilot features. This will be instantiated in both leader and followers.
 	// However, only active node will have a "running" autopilot.
 	autopilot *autopilot.Autopilot
+
+	// delegate is the autopilot delegate that will be used to interact with the
+	// autopilot library.
+	delegate *Delegate
 
 	// autopilotConfig represents the configuration required to instantiate autopilot.
 	autopilotConfig *AutopilotConfig
@@ -325,7 +334,7 @@ func NewRaftBackend(conf map[string]string, logger log.Logger) (physical.Backend
 	if path == "" {
 		pathFromConfig, ok := conf["path"]
 		if !ok {
-			return nil, fmt.Errorf("'path' must be set")
+			return nil, errors.New("'path' must be set")
 		}
 		path = pathFromConfig
 	}
@@ -652,7 +661,7 @@ func (b *RaftBackend) CollectMetrics(sink *metricsutil.ClusterMetricSink) {
 
 func (b *RaftBackend) collectMetricsWithStats(stats bolt.Stats, sink *metricsutil.ClusterMetricSink, database string) {
 	txstats := stats.TxStats
-	labels := []metricsutil.Label{{"database", database}}
+	labels := []metricsutil.Label{{Name: "database", Value: database}}
 	sink.SetGaugeWithLabels([]string{"raft_storage", "bolt", "freelist", "free_pages"}, float32(stats.FreePageN), labels)
 	sink.SetGaugeWithLabels([]string{"raft_storage", "bolt", "freelist", "pending_pages"}, float32(stats.PendingPageN), labels)
 	sink.SetGaugeWithLabels([]string{"raft_storage", "bolt", "freelist", "allocated_bytes"}, float32(stats.FreeAlloc), labels)
@@ -990,14 +999,6 @@ func (b *RaftBackend) SetupCluster(ctx context.Context, opts SetupOpts) error {
 			return fmt.Errorf("raft recovery failed to parse peers.json: %w", err)
 		}
 
-		// Non-voting servers are only allowed in enterprise. If Suffrage is disabled,
-		// error out to indicate that it isn't allowed.
-		for idx := range recoveryConfig.Servers {
-			if recoveryConfig.Servers[idx].Suffrage == raft.Nonvoter {
-				return fmt.Errorf("raft recovery failed to parse configuration for node %q: setting `non_voter` not supported in OpenBao", recoveryConfig.Servers[idx].ID)
-			}
-		}
-
 		b.logger.Info("raft recovery found new config", "config", recoveryConfig)
 
 		err = raft.RecoverCluster(raftConfig, b.fsm, b.logStore, b.stableStore, b.snapStore, b.raftTransport, recoveryConfig)
@@ -1232,6 +1233,115 @@ func (b *RaftBackend) RemovePeer(ctx context.Context, peerID string) error {
 	return b.autopilot.RemoveServer(raft.ServerID(peerID))
 }
 
+// PromotePeer promotes a permanent non-voter to voter
+func (b *RaftBackend) PromotePeer(ctx context.Context, peerID string) error {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if b.disableAutopilot {
+		if b.raft == nil {
+			return errors.New("raft storage is not initialized")
+		}
+		peers, err := b.Peers(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get Raft peers: %s", err)
+		}
+
+		found := false
+		addr := ""
+		for _, peer := range peers {
+			if peer.ID == peerID {
+				addr = peer.Address
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("server %s not found in raft configuration", peerID)
+		}
+
+		future := b.raft.AddVoter(raft.ServerID(peerID), raft.ServerAddress(addr), 0, 0)
+		if err := future.Error(); err != nil {
+			return fmt.Errorf("failed to promote non-voter to voter: %s", err)
+		}
+		return nil
+	}
+
+	if b.autopilot == nil {
+		return errors.New("raft storage autopilot is not initialized")
+	}
+
+	if !b.delegate.IsNonVoter(raft.ServerID(peerID)) {
+		return errors.New("server is not a non-voter")
+	}
+
+	b.logger.Trace("promoting non-voter to voter", "id", peerID)
+	return b.delegate.RemoveNonVoter(raft.ServerID(peerID))
+}
+
+// DemotePeer demotes a voter to a permanent non-voter
+func (b *RaftBackend) DemotePeer(ctx context.Context, peerID string) error {
+	b.l.RLock()
+	defer b.l.RUnlock()
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if b.disableAutopilot {
+		if b.raft == nil {
+			return errors.New("raft storage is not initialized")
+		}
+
+		// refuse to demote current leader to not trigger a leader election
+		// when the leader is demoted. This is not necessary if autopilot is enabled,
+		// as it will handle this case for us and only demote the leader after a
+		// leader election
+		if strings.EqualFold(peerID, b.localID) {
+			return errors.New("refusing to demote current leader")
+		}
+
+		peers, err := b.Peers(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get Raft peers: %s", err)
+		}
+
+		found := false
+		for _, peer := range peers {
+			if peer.ID == peerID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			return fmt.Errorf("server %s not found in raft configuration", peerID)
+		}
+
+		future := b.raft.DemoteVoter(raft.ServerID(peerID), 0, 0)
+		if err := future.Error(); err != nil {
+			return fmt.Errorf("failed to demote voter to non-voter: %s", err)
+		}
+		return nil
+	}
+
+	if b.autopilot == nil {
+		return errors.New("raft storage autopilot is not initialized")
+	}
+
+	b.logger.Trace("demoting voter to non-voter", "id", peerID)
+
+	if b.delegate.IsNonVoter(raft.ServerID(peerID)) {
+		return errors.New("server is already a non-voter")
+	}
+
+	return b.delegate.AddNonVoter(raft.ServerID(peerID))
+}
+
 // GetConfigurationOffline is used to read the stale, last known raft
 // configuration to this node. It accesses the last state written into the
 // FSM. When a server is online use GetConfiguration instead.
@@ -1309,7 +1419,7 @@ func (b *RaftBackend) GetConfiguration(ctx context.Context) (*RaftConfigurationR
 }
 
 // AddPeer adds a new server to the raft cluster
-func (b *RaftBackend) AddPeer(ctx context.Context, peerID, clusterAddr string) error {
+func (b *RaftBackend) AddPeer(ctx context.Context, peerID, clusterAddr string, voter bool) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1322,7 +1432,13 @@ func (b *RaftBackend) AddPeer(ctx context.Context, peerID, clusterAddr string) e
 			return errors.New("raft storage is not initialized")
 		}
 		b.logger.Trace("adding server to raft", "id", peerID)
-		future := b.raft.AddVoter(raft.ServerID(peerID), raft.ServerAddress(clusterAddr), 0, 0)
+		var future raft.IndexFuture
+		if voter {
+			future = b.raft.AddVoter(raft.ServerID(peerID), raft.ServerAddress(clusterAddr), 0, 0)
+		} else {
+			future = b.raft.AddNonvoter(raft.ServerID(peerID), raft.ServerAddress(clusterAddr), 0, 0)
+		}
+
 		return future.Error()
 	}
 
@@ -1330,13 +1446,27 @@ func (b *RaftBackend) AddPeer(ctx context.Context, peerID, clusterAddr string) e
 		return errors.New("raft storage autopilot is not initialized")
 	}
 
-	b.logger.Trace("adding server to raft via autopilot", "id", peerID)
+	var nodeType autopilot.NodeType
+	if voter {
+		nodeType = autopilot.NodeVoter
+	} else {
+		nodeType = NodeNonVoter
+	}
+
+	b.logger.Debug("adding server to raft via autopilot", "id", peerID)
+	if !voter {
+		b.logger.Debug("adding non-voter to raft via autopilot", "id", peerID)
+		err := b.delegate.AddNonVoter(raft.ServerID(peerID))
+		if err != nil {
+			return err
+		}
+	}
 	return b.autopilot.AddServer(&autopilot.Server{
 		ID:          raft.ServerID(peerID),
 		Name:        peerID,
 		Address:     raft.ServerAddress(clusterAddr),
 		RaftVersion: raft.ProtocolVersionMax,
-		NodeType:    autopilot.NodeVoter,
+		NodeType:    nodeType,
 	})
 }
 
@@ -1678,7 +1808,7 @@ func (b *RaftBackend) applyLog(ctx context.Context, command *LogData) error {
 		if len(fsmar.EntrySlice) == 1 {
 			fsmEntry := fsmar.EntrySlice[0]
 			if !fsmEntry.IsTxError() {
-				return fmt.Errorf("unknown FSMEntry response type")
+				return errors.New("unknown FSMEntry response type")
 			}
 
 			return fsmEntry.AsTxError()

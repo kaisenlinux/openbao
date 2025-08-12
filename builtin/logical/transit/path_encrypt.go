@@ -7,11 +7,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"reflect"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/errutil"
 	"github.com/openbao/openbao/sdk/v2/helper/keysutil"
@@ -152,9 +152,13 @@ will be ignored. Any batch output will preserve the order of the batch input.`,
 			},
 		},
 
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.CreateOperation: b.pathEncryptWrite,
-			logical.UpdateOperation: b.pathEncryptWrite,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.CreateOperation: &framework.PathOperation{
+				Callback: b.pathEncryptWrite,
+			},
+			logical.UpdateOperation: &framework.PathOperation{
+				Callback: b.pathEncryptWrite,
+			},
 		},
 
 		ExistenceCheck: b.pathEncryptExistenceCheck,
@@ -195,7 +199,7 @@ func decodeBatchRequestItems(src interface{}, requirePlaintext bool, requireCiph
 	}
 
 	// To comply with mapstructure output the same error type is needed.
-	var errs mapstructure.Error
+	var errs []error
 
 	for i, iitem := range items {
 		item, ok := iitem.(map[string]interface{})
@@ -208,7 +212,7 @@ func decodeBatchRequestItems(src interface{}, requirePlaintext bool, requireCiph
 			} else if casted, ok := v.(string); ok {
 				(*dst)[i].Context = casted
 			} else {
-				errs.Errors = append(errs.Errors, fmt.Sprintf("'[%d].context' expected type 'string', got unconvertible type '%T'", i, item["context"]))
+				errs = append(errs, fmt.Errorf("'[%d].context' expected type 'string', got unconvertible type '%T'", i, item["context"]))
 			}
 		}
 
@@ -217,20 +221,20 @@ func decodeBatchRequestItems(src interface{}, requirePlaintext bool, requireCiph
 			} else if casted, ok := v.(string); ok {
 				(*dst)[i].Ciphertext = casted
 			} else {
-				errs.Errors = append(errs.Errors, fmt.Sprintf("'[%d].ciphertext' expected type 'string', got unconvertible type '%T'", i, item["ciphertext"]))
+				errs = append(errs, fmt.Errorf("'[%d].ciphertext' expected type 'string', got unconvertible type '%T'", i, item["ciphertext"]))
 			}
 		} else if requireCiphertext {
-			errs.Errors = append(errs.Errors, fmt.Sprintf("'[%d].ciphertext' missing ciphertext to decrypt", i))
+			errs = append(errs, fmt.Errorf("'[%d].ciphertext' missing ciphertext to decrypt", i))
 		}
 
 		if v, has := item["plaintext"]; has {
 			if casted, ok := v.(string); ok {
 				(*dst)[i].Plaintext = casted
 			} else {
-				errs.Errors = append(errs.Errors, fmt.Sprintf("'[%d].plaintext' expected type 'string', got unconvertible type '%T'", i, item["plaintext"]))
+				errs = append(errs, fmt.Errorf("'[%d].plaintext' expected type 'string', got unconvertible type '%T'", i, item["plaintext"]))
 			}
 		} else if requirePlaintext {
-			errs.Errors = append(errs.Errors, fmt.Sprintf("'[%d].plaintext' missing plaintext to encrypt", i))
+			errs = append(errs, fmt.Errorf("'[%d].plaintext' missing plaintext to encrypt", i))
 		}
 
 		if v, has := item["key_version"]; has {
@@ -243,10 +247,10 @@ func decodeBatchRequestItems(src interface{}, requirePlaintext bool, requireCiph
 				if casted, err := js.Int64(); err == nil {
 					(*dst)[i].KeyVersion = int(casted)
 				} else {
-					errs.Errors = append(errs.Errors, fmt.Sprintf(`error decoding %T into [%d].key_version: strconv.ParseInt: parsing "%s": invalid syntax`, v, i, v))
+					errs = append(errs, fmt.Errorf(`error decoding %T into [%d].key_version: strconv.ParseInt: parsing "%s": invalid syntax`, v, i, v))
 				}
 			} else {
-				errs.Errors = append(errs.Errors, fmt.Sprintf("'[%d].key_version' expected type 'int', got unconvertible type '%T'", i, item["key_version"]))
+				errs = append(errs, fmt.Errorf("'[%d].key_version' expected type 'int', got unconvertible type '%T'", i, item["key_version"]))
 			}
 		}
 
@@ -255,7 +259,7 @@ func decodeBatchRequestItems(src interface{}, requirePlaintext bool, requireCiph
 			} else if casted, ok := v.(string); ok {
 				(*dst)[i].AssociatedData = casted
 			} else {
-				errs.Errors = append(errs.Errors, fmt.Sprintf("'[%d].associated_data' expected type 'string', got unconvertible type '%T'", i, item["associated_data"]))
+				errs = append(errs, fmt.Errorf("'[%d].associated_data' expected type 'string', got unconvertible type '%T'", i, item["associated_data"]))
 			}
 		}
 		if v, has := item["reference"]; has {
@@ -263,13 +267,13 @@ func decodeBatchRequestItems(src interface{}, requirePlaintext bool, requireCiph
 			} else if casted, ok := v.(string); ok {
 				(*dst)[i].Reference = casted
 			} else {
-				errs.Errors = append(errs.Errors, fmt.Sprintf("'[%d].reference' expected type 'string', got unconvertible type '%T'", i, item["reference"]))
+				errs = append(errs, fmt.Errorf("'[%d].reference' expected type 'string', got unconvertible type '%T'", i, item["reference"]))
 			}
 		}
 	}
 
-	if len(errs.Errors) > 0 {
-		return &errs
+	if len(errs) > 0 {
+		return errors.Join(errs...)
 	}
 
 	return nil
@@ -292,8 +296,13 @@ func (b *backend) pathEncryptExistenceCheck(ctx context.Context, req *logical.Re
 }
 
 func (b *backend) pathEncryptWrite(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	txRollback, err := logical.StartTxStorage(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	defer txRollback()
+
 	name := d.Get("name").(string)
-	var err error
 	batchInputRaw := d.Raw["batch_input"]
 	var batchInputItems []BatchRequestItem
 	if batchInputRaw != nil {
@@ -488,6 +497,10 @@ func (b *backend) pathEncryptWrite(ctx context.Context, req *logical.Request, d 
 
 	if req.Operation == logical.CreateOperation && !upserted {
 		resp.AddWarning("Attempted creation of the key during the encrypt operation, but it was created beforehand")
+	}
+
+	if err := logical.EndTxStorage(ctx, req); err != nil {
+		return nil, err
 	}
 
 	return batchRequestResponse(d, resp, req, successesInBatch, userErrorInBatch, internalErrorInBatch)

@@ -1,3 +1,11 @@
+openbao (2.3.1-1kaisen) kaisen-packages; urgency=medium
+
+  * Import the 2.3.1 release
+  * Update the no-display-HEAD-for-version quilt patch
+  * Bump the golang-go version required to build
+
+ -- Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>  Sat, 09 Aug 2025 20:15:51 +0200
+
 openbao (2.1.0-1kaisen) kaisen-packages; urgency=medium
 
   * Import the 2.1.0 release

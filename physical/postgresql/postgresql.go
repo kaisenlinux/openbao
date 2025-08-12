@@ -6,6 +6,7 @@ package postgresql
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -13,10 +14,11 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics"
+	"github.com/cenkalti/backoff/v4"
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-secure-stdlib/parseutil"
 	"github.com/hashicorp/go-uuid"
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/sdk/v2/database/helper/dbutil"
 	"github.com/openbao/openbao/sdk/v2/physical"
@@ -72,7 +74,6 @@ type PostgreSQLBackend struct {
 
 	haEnabled     bool
 	logger        log.Logger
-	permitPool    *physical.PermitPool
 	txnPermitPool *physical.PermitPool
 }
 
@@ -100,9 +101,6 @@ type PostgreSQLLock struct {
 func NewPostgreSQLBackend(conf map[string]string, logger log.Logger) (physical.Backend, error) {
 	// Get the PostgreSQL credentials to perform read/write operations.
 	connURL := connectionURL(conf)
-	if connURL == "" {
-		return nil, fmt.Errorf("missing connection_url")
-	}
 
 	unquoted_table, ok := conf["table"]
 	if !ok {
@@ -157,8 +155,23 @@ func NewPostgreSQLBackend(conf map[string]string, logger log.Logger) (physical.B
 		}
 	}
 
+	// Set maximum retries for DB connection liveness check on startup.
+	maxRetriesStr, ok := conf["max_connect_retries"]
+	var maxRetriesInt int
+	if ok {
+		maxRetriesInt, err = strconv.Atoi(maxRetriesStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed parsing max_connect_retries parameter: %w", err)
+		}
+		if logger.IsDebug() {
+			logger.Debug("max_connect_retries set", "max_connect_retries", maxRetriesInt)
+		}
+	} else {
+		maxRetriesInt = 1
+	}
+
 	// Create PostgreSQL handle for the database.
-	db, err := sql.Open("pgx", connURL)
+	db, err := doRetryConnect(logger, connURL, uint64(maxRetriesInt))
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
@@ -176,7 +189,7 @@ func NewPostgreSQLBackend(conf map[string]string, logger log.Logger) (physical.B
 	}
 
 	if !upsertAvailable && conf["ha_enabled"] == "true" {
-		return nil, fmt.Errorf("ha_enabled=true in config but PG version doesn't support HA, must be at least 9.5")
+		return nil, errors.New("ha_enabled=true in config but PG version doesn't support HA, must be at least 9.5")
 	}
 
 	// Setup our put strategy based on the presence or absence of a native
@@ -231,7 +244,6 @@ func NewPostgreSQLBackend(conf map[string]string, logger log.Logger) (physical.B
 		// $1=ha_identity $2=ha_key
 		" DELETE FROM " + quoted_ha_table + " WHERE ha_identity=$1 AND ha_key=$2 ",
 		logger:          logger,
-		permitPool:      physical.NewPermitPool(maxParInt),
 		txnPermitPool:   physical.NewPermitPool(txnMaxParInt),
 		haEnabled:       conf["ha_enabled"] == "true",
 		upsert_function: quoted_upsert_function,
@@ -247,43 +259,8 @@ func NewPostgreSQLBackend(conf map[string]string, logger log.Logger) (physical.B
 		return nil, fmt.Errorf("failed to parse value for `skip_create_table`: %w", err)
 	}
 	if !skip_create_table {
-		txn, err := db.BeginTx(context.TODO(), &sql.TxOptions{
-			Isolation: sql.LevelRepeatableRead,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to begin transaction to attempt table creation: %w", err)
-		}
-
-		defer txn.Rollback()
-
-		createTableQuery := "CREATE TABLE IF NOT EXISTS " + quoted_table + " (" +
-			`parent_path TEXT COLLATE "C" NOT NULL,` +
-			`  path        TEXT COLLATE "C",` +
-			`  key         TEXT COLLATE "C",` +
-			`  value       BYTEA,` +
-			`  CONSTRAINT pkey PRIMARY KEY (path, key)` +
-			`);`
-		if _, err := db.Exec(createTableQuery); err != nil {
-			return nil, fmt.Errorf("failed to create table: %w", err)
-		}
-
-		createIndexQuery := `CREATE INDEX IF NOT EXISTS parent_path_idx ON ` + quoted_table + ` (parent_path);`
-		if _, err := db.Exec(createIndexQuery); err != nil {
-			return nil, fmt.Errorf("failed to create index on table: %w", err)
-		}
-
-		if m.haEnabled {
-			// Successfully detected that there is no table; create it.
-			createTableQuery := `CREATE TABLE IF NOT EXISTS ` + quoted_ha_table + ` (` +
-				`  ha_key      TEXT COLLATE "C" NOT NULL,` +
-				`  ha_identity TEXT COLLATE "C" NOT NULL,` +
-				`  ha_value    TEXT COLLATE "C",` +
-				`  valid_until TIMESTAMP WITH TIME ZONE NOT NULL,` +
-				`  CONSTRAINT ha_key PRIMARY KEY (ha_key)` +
-				`);`
-			if _, err := db.Exec(createTableQuery); err != nil {
-				return nil, fmt.Errorf("failed to create ha table: %w", err)
-			}
+		if err := m.createTables(); err != nil {
+			return nil, fmt.Errorf("failed to create tables: %w", err)
 		}
 	}
 
@@ -301,6 +278,90 @@ func connectionURL(conf map[string]string) string {
 	}
 
 	return connURL
+}
+
+func doRetryConnect(logger log.Logger, connURL string, retries uint64) (*sql.DB, error) {
+	db, err := sql.Open("pgx", connURL)
+	if err != nil {
+		return nil, err
+	}
+
+	var b backoff.BackOff = backoff.NewExponentialBackOff(
+		backoff.WithMaxInterval(5*time.Second),
+		backoff.WithInitialInterval(15*time.Millisecond),
+	)
+	if retries > 0 {
+		b = backoff.WithMaxRetries(b, retries)
+	}
+
+	b.Reset()
+
+	if err := backoff.Retry(func() error {
+		err := db.Ping()
+		if err != nil {
+			logger.Debug("database not ready", "err", err)
+			return err
+		}
+
+		return nil
+	}, b); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("unable to verify connection: %w", err)
+	}
+
+	return db, nil
+}
+
+func (m *PostgreSQLBackend) createTables() error {
+	txn, err := m.client.BeginTx(context.TODO(), &sql.TxOptions{
+		Isolation: sql.LevelRepeatableRead,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+
+	defer txn.Rollback()
+
+	createTableQuery := "CREATE TABLE IF NOT EXISTS " + m.table + " (" +
+		`parent_path TEXT COLLATE "C" NOT NULL,` +
+		`  path        TEXT COLLATE "C",` +
+		`  key         TEXT COLLATE "C",` +
+		`  value       BYTEA,` +
+		`  CONSTRAINT pkey PRIMARY KEY (path, key)` +
+		`);`
+	if _, err := txn.Exec(createTableQuery); err != nil {
+		if strings.Contains(err.Error(), "SQLSTATE 25006") {
+			m.logger.Warn("Skipping table creation as database is marked read-only", "err", err)
+			return nil
+		}
+
+		return fmt.Errorf("failed to execute create query: %w", err)
+	}
+
+	createIndexQuery := `CREATE INDEX IF NOT EXISTS parent_path_idx ON ` + m.table + ` (parent_path);`
+	if _, err := txn.Exec(createIndexQuery); err != nil {
+		return fmt.Errorf("failed to create index on table: %w", err)
+	}
+
+	if m.haEnabled {
+		// Successfully detected that there is no table; create it.
+		createTableQuery := `CREATE TABLE IF NOT EXISTS ` + m.ha_table + ` (` +
+			`  ha_key      TEXT COLLATE "C" NOT NULL,` +
+			`  ha_identity TEXT COLLATE "C" NOT NULL,` +
+			`  ha_value    TEXT COLLATE "C",` +
+			`  valid_until TIMESTAMP WITH TIME ZONE NOT NULL,` +
+			`  CONSTRAINT ha_key PRIMARY KEY (ha_key)` +
+			`);`
+		if _, err := txn.Exec(createTableQuery); err != nil {
+			return fmt.Errorf("failed to create ha table: %w", err)
+		}
+	}
+
+	if err := txn.Commit(); err != nil {
+		return fmt.Errorf("failed to apply transaction: %w", err)
+	}
+
+	return nil
 }
 
 // splitKey is a helper to split a full path key into individual
@@ -331,9 +392,6 @@ func (m *PostgreSQLBackend) splitKey(fullPath string) (string, string, string) {
 func (m *PostgreSQLBackend) Put(ctx context.Context, entry *physical.Entry) error {
 	defer metrics.MeasureSince([]string{"postgres", "put"}, time.Now())
 
-	m.permitPool.Acquire()
-	defer m.permitPool.Release()
-
 	parentPath, path, key := m.splitKey(entry.Key)
 
 	_, err := m.client.ExecContext(ctx, m.put_query, parentPath, path, key, entry.Value)
@@ -346,9 +404,6 @@ func (m *PostgreSQLBackend) Put(ctx context.Context, entry *physical.Entry) erro
 // Get is used to fetch and entry.
 func (m *PostgreSQLBackend) Get(ctx context.Context, fullPath string) (*physical.Entry, error) {
 	defer metrics.MeasureSince([]string{"postgres", "get"}, time.Now())
-
-	m.permitPool.Acquire()
-	defer m.permitPool.Release()
 
 	_, path, key := m.splitKey(fullPath)
 
@@ -372,9 +427,6 @@ func (m *PostgreSQLBackend) Get(ctx context.Context, fullPath string) (*physical
 func (m *PostgreSQLBackend) Delete(ctx context.Context, fullPath string) error {
 	defer metrics.MeasureSince([]string{"postgres", "delete"}, time.Now())
 
-	m.permitPool.Acquire()
-	defer m.permitPool.Release()
-
 	_, path, key := m.splitKey(fullPath)
 
 	_, err := m.client.ExecContext(ctx, m.delete_query, path, key)
@@ -388,9 +440,6 @@ func (m *PostgreSQLBackend) Delete(ctx context.Context, fullPath string) error {
 // prefix, up to the next prefix.
 func (m *PostgreSQLBackend) List(ctx context.Context, prefix string) ([]string, error) {
 	defer metrics.MeasureSince([]string{"postgres", "list"}, time.Now())
-
-	m.permitPool.Acquire()
-	defer m.permitPool.Release()
 
 	rows, err := m.client.QueryContext(ctx, m.list_query, "/"+prefix)
 	if err != nil {
@@ -416,9 +465,6 @@ func (m *PostgreSQLBackend) List(ctx context.Context, prefix string) ([]string, 
 // prefix, after the given key, up to the given key.
 func (m *PostgreSQLBackend) ListPage(ctx context.Context, prefix string, after string, limit int) ([]string, error) {
 	defer metrics.MeasureSince([]string{"postgres", "list-page"}, time.Now())
-
-	m.permitPool.Acquire()
-	defer m.permitPool.Release()
 
 	var rows *sql.Rows
 	var err error
@@ -502,8 +548,6 @@ func (l *PostgreSQLLock) Lock(stopCh <-chan struct{}) (<-chan struct{}, error) {
 // PostgreSQL table.
 func (l *PostgreSQLLock) Unlock() error {
 	pg := l.backend
-	pg.permitPool.Acquire()
-	defer pg.permitPool.Release()
 
 	if l.renewTicker != nil {
 		l.renewTicker.Stop()
@@ -518,8 +562,6 @@ func (l *PostgreSQLLock) Unlock() error {
 // including this one, and returns the current value.
 func (l *PostgreSQLLock) Value() (bool, string, error) {
 	pg := l.backend
-	pg.permitPool.Acquire()
-	defer pg.permitPool.Release()
 	var result string
 	err := pg.client.QueryRow(pg.haGetLockValueQuery, l.key).Scan(&result)
 
@@ -578,8 +620,6 @@ func (l *PostgreSQLLock) periodicallyRenewLock(done chan struct{}) {
 // else has the lock, whereas non-nil means that something unexpected happened.
 func (l *PostgreSQLLock) writeItem() (bool, error) {
 	pg := l.backend
-	pg.permitPool.Acquire()
-	defer pg.permitPool.Release()
 
 	// Try steal lock or update expiry on my lock
 
@@ -588,7 +628,7 @@ func (l *PostgreSQLLock) writeItem() (bool, error) {
 		return false, err
 	}
 	if sqlResult == nil {
-		return false, fmt.Errorf("empty SQL response received")
+		return false, errors.New("empty SQL response received")
 	}
 
 	ar, err := sqlResult.RowsAffected()

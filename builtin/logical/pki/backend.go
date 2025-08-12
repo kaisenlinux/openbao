@@ -125,6 +125,10 @@ func Backend(conf *logical.BackendConfig) *backend {
 		Paths: []*framework.Path{
 			pathListRoles(&b),
 			pathRoles(&b),
+			pathListCelRoles(&b),
+			pathCelRoles(&b),
+			pathCelIssue(&b),
+			pathCelSign(&b),
 			pathGenerateRoot(&b),
 			pathSignIntermediate(&b),
 			pathSignSelfIssued(&b),
@@ -182,6 +186,7 @@ func Backend(conf *logical.BackendConfig) *backend {
 			pathFetchValidRaw(&b),
 			pathFetchValid(&b),
 			pathFetchListCerts(&b),
+			pathFetchListCertsDetailed(&b),
 
 			// OCSP APIs
 			buildPathOcspGet(&b),
@@ -357,7 +362,7 @@ func (b *backend) metricsWrap(callType string, roleMode int, ofunc roleOperation
 			if role == nil && (roleMode == roleRequired || len(roleName) > 0) {
 				return logical.ErrorResponse(fmt.Sprintf("unknown role: %s", roleName)), nil
 			}
-			labels = []metrics.Label{{"role", roleName}}
+			labels = []metrics.Label{{Name: "role", Value: roleName}}
 		}
 
 		ns, err := namespace.FromContext(ctx)

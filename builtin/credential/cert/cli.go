@@ -4,10 +4,11 @@
 package cert
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/openbao/openbao/api/v2"
 )
 
@@ -35,7 +36,7 @@ func (h *CLIHandler) Auth(c *api.Client, m map[string]string, nonInteractive boo
 		return nil, err
 	}
 	if secret == nil {
-		return nil, fmt.Errorf("empty response from credential provider")
+		return nil, errors.New("empty response from credential provider")
 	}
 
 	return secret, nil

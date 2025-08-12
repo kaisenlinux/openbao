@@ -5,11 +5,12 @@ package kubesecrets
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/strutil"
 	"github.com/openbao/openbao/sdk/v2/helper/template"
@@ -149,7 +150,7 @@ func (b *backend) isValidKubernetesNamespace(ctx context.Context, req *logical.R
 			return true, nil
 		}
 
-		return false, fmt.Errorf("'kubernetes_namespace' is required unless the OpenBao role has a single namespace specified")
+		return false, errors.New("'kubernetes_namespace' is required unless the OpenBao role has a single namespace specified")
 	}
 
 	if strutil.StrListContains(role.K8sNamespaces, "*") || strutil.StrListContains(role.K8sNamespaces, request.Namespace) {
@@ -307,7 +308,7 @@ func (b *backend) createCreds(ctx context.Context, req *logical.Request, role *r
 		createdK8sRoleBinding = genName
 
 	default:
-		return nil, fmt.Errorf("one of service_account_name, kubernetes_role_name, or generated_role_rules must be set")
+		return nil, errors.New("one of service_account_name, kubernetes_role_name, or generated_role_rules must be set")
 	}
 
 	resp := b.Secret(kubeTokenType).Response(map[string]interface{}{

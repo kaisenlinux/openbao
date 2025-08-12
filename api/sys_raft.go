@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/hashicorp/go-secure-stdlib/parseutil"
-	"github.com/mitchellh/mapstructure"
 )
 
 var ErrIncompleteSnapshot = errors.New("incomplete snapshot, unable to read SHA256SUMS.sealed file")
@@ -270,11 +270,6 @@ func (c *Sys) RaftAutopilotState() (*AutopilotState, error) {
 	return c.RaftAutopilotStateWithContext(context.Background())
 }
 
-// RaftAutopilotStateWithToken wraps RaftAutopilotStateWithContext using the given token.
-func (c *Sys) RaftAutopilotStateWithDRToken(drToken string) (*AutopilotState, error) {
-	return c.RaftAutopilotStateWithContext(context.WithValue(context.Background(), "dr-token", drToken))
-}
-
 // RaftAutopilotStateWithContext returns the state of the raft cluster as seen by autopilot.
 func (c *Sys) RaftAutopilotStateWithContext(ctx context.Context) (*AutopilotState, error) {
 	ctx, cancelFunc := c.c.withConfiguredTimeout(ctx)
@@ -316,11 +311,6 @@ func (c *Sys) RaftAutopilotStateWithContext(ctx context.Context) (*AutopilotStat
 // RaftAutopilotConfiguration wraps RaftAutopilotConfigurationWithContext using context.Background.
 func (c *Sys) RaftAutopilotConfiguration() (*AutopilotConfig, error) {
 	return c.RaftAutopilotConfigurationWithContext(context.Background())
-}
-
-// RaftAutopilotConfigurationWithDRToken wraps RaftAutopilotConfigurationWithContext using the given token.
-func (c *Sys) RaftAutopilotConfigurationWithDRToken(drToken string) (*AutopilotConfig, error) {
-	return c.RaftAutopilotConfigurationWithContext(context.WithValue(context.Background(), "dr-token", drToken))
 }
 
 // RaftAutopilotConfigurationWithContext fetches the autopilot config.

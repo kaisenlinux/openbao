@@ -12,9 +12,9 @@ import (
 
 	"github.com/go-jose/go-jose/v3"
 	josejwt "github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-viper/mapstructure/v2"
 	capjwt "github.com/hashicorp/cap/jwt"
 	"github.com/hashicorp/go-secure-stdlib/strutil"
-	"github.com/mitchellh/mapstructure"
 	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/cidrutil"
 	"github.com/openbao/openbao/sdk/v2/logical"
@@ -50,10 +50,16 @@ func pathLogin(b *kubeAuthBackend) *framework.Path {
 			},
 		},
 
-		Callbacks: map[logical.Operation]framework.OperationFunc{
-			logical.UpdateOperation:         b.pathLogin,
-			logical.AliasLookaheadOperation: b.aliasLookahead,
-			logical.ResolveRoleOperation:    b.pathResolveRole,
+		Operations: map[logical.Operation]framework.OperationHandler{
+			logical.UpdateOperation: &framework.PathOperation{
+				Callback: b.pathLogin,
+			},
+			logical.AliasLookaheadOperation: &framework.PathOperation{
+				Callback: b.aliasLookahead,
+			},
+			logical.ResolveRoleOperation: &framework.PathOperation{
+				Callback: b.pathResolveRole,
+			},
 		},
 
 		HelpSynopsis:    pathLoginHelpSyn,
@@ -206,7 +212,7 @@ func (b *kubeAuthBackend) getAliasName(role *roleStorageEntry, serviceAccount *s
 	case aliasNameSourceSAName:
 		ns, name := serviceAccount.namespace(), serviceAccount.name()
 		if ns == "" || name == "" {
-			return "", fmt.Errorf("service account namespace and name must be set")
+			return "", errors.New("service account namespace and name must be set")
 		}
 		return fmt.Sprintf("%s/%s", ns, name), nil
 	default:
@@ -484,7 +490,7 @@ func (b *kubeAuthBackend) pathLoginRenew() framework.OperationFunc {
 	return func(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 		roleName := req.Auth.InternalData["role"].(string)
 		if roleName == "" {
-			return nil, fmt.Errorf("failed to fetch role_name during renewal")
+			return nil, errors.New("failed to fetch role_name during renewal")
 		}
 
 		b.l.RLock()

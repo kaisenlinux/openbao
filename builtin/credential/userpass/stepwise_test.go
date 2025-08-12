@@ -4,11 +4,12 @@
 package userpass
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 
-	"github.com/mitchellh/mapstructure"
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/openbao/openbao/api/v2"
 	"github.com/openbao/openbao/sdk/v2/helper/policyutil"
 	"github.com/openbao/openbao/sdk/v2/helper/stepwise"
@@ -64,7 +65,7 @@ func testAccStepwiseReadUser(t *testing.T, name string, policies string) stepwis
 					return nil
 				}
 
-				return fmt.Errorf("unexpected nil response")
+				return errors.New("unexpected nil response")
 			}
 
 			var d struct {

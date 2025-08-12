@@ -1,8 +1,8 @@
 Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 
---- openbao-2.0.0.orig/scripts/build.sh
-+++ openbao-2.0.0/scripts/build.sh
-@@ -21,10 +21,10 @@ cd "$DIR"
+--- openbao-2.3.1.orig/scripts/build.sh
++++ openbao-2.3.1/scripts/build.sh
+@@ -25,10 +25,10 @@ cd "$DIR"
  BUILD_TAGS="${BUILD_TAGS:-"openbao"}"
  
  # Get the git commit
@@ -12,12 +12,12 @@ Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
 +#GIT_DIRTY="$(test -n "`git status --porcelain`" && echo "+CHANGES" || true)"
  
 -BUILD_DATE="$(git show --no-show-signature -s --format=%cd --date=format:"%Y-%m-%dT%H:%M:%SZ" HEAD)"
-+#BUILD_DATE="$(git show --no-show-signature -s --format=%cd --date=format:"%Y-%m-%dT%H:%M:%SZ" HEAD)"
++BUILD_DATE="2025/08/09"
  
  GOPATH=${GOPATH:-$(${GO_CMD} env GOPATH)}
  case $(uname) in
-@@ -43,7 +43,7 @@ mkdir -p bin/
- echo "==> Building..."
+@@ -47,7 +47,7 @@ mkdir -p bin/
+ echo "==> Building bao..."
  ${GO_CMD} build \
      -gcflags "${GCFLAGS}" \
 -    -ldflags "${LD_FLAGS} -X github.com/openbao/openbao/version.GitCommit='${GIT_COMMIT}${GIT_DIRTY}' -X github.com/openbao/openbao/version.BuildDate=${BUILD_DATE}" \
@@ -25,3 +25,12 @@ Author: Kevin Chevreuil - Kaisen <kaisen@kaisenlinux.org>
      -o "bin/bao" \
      -tags "${BUILD_TAGS}" \
      .
+@@ -66,7 +66,7 @@ if [ "$1" == "plugin" ]; then
+                 dirname="$(basename "$dir")"
+                 ${GO_CMD} build \
+                     -gcflags "${GCFLAGS}" \
+-                    -ldflags "${LD_FLAGS} -X github.com/openbao/openbao/version.GitCommit='${GIT_COMMIT}${GIT_DIRTY}' -X github.com/openbao/openbao/version.BuildDate=${BUILD_DATE}" \
++                    -ldflags "${LD_FLAGS} -X github.com/openbao/openbao/version.BuildDate=${BUILD_DATE}" \
+                     -o "bin/$etype-$plugin_name-$dirname" \
+                     -tags "${BUILD_TAGS}" \
+                     github.com/openbao/openbao/$dir

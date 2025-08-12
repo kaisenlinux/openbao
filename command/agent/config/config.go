@@ -15,11 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-viper/mapstructure/v2"
 	"github.com/hashicorp/go-multierror"
 	"github.com/hashicorp/go-secure-stdlib/parseutil"
 	"github.com/hashicorp/hcl"
 	"github.com/hashicorp/hcl/hcl/ast"
-	"github.com/mitchellh/mapstructure"
 	ctconfig "github.com/openbao/openbao-template/config"
 	ctsignals "github.com/openbao/openbao-template/signals"
 	"k8s.io/utils/strings/slices"
@@ -28,6 +28,7 @@ import (
 	"github.com/openbao/openbao/command/agentproxyshared"
 	"github.com/openbao/openbao/helper/namespace"
 	"github.com/openbao/openbao/internalshared/configutil"
+	"github.com/openbao/openbao/sdk/v2/framework"
 	"github.com/openbao/openbao/sdk/v2/helper/pointerutil"
 )
 
@@ -295,7 +296,7 @@ func (c *Config) ValidateConfig() error {
 	if c.APIProxy != nil && c.Cache != nil {
 		if c.Cache.UseAutoAuthTokenRaw != nil {
 			if c.APIProxy.UseAutoAuthTokenRaw != nil {
-				return fmt.Errorf("use_auto_auth_token defined in both api_proxy and cache config. Please remove this configuration from the cache block")
+				return errors.New("use_auto_auth_token defined in both api_proxy and cache config. Please remove this configuration from the cache block")
 			} else {
 				c.APIProxy.ForceAutoAuthToken = c.Cache.ForceAutoAuthToken
 			}
@@ -304,30 +305,30 @@ func (c *Config) ValidateConfig() error {
 
 	if c.Cache != nil {
 		if len(c.Listeners) < 1 && len(c.Templates) < 1 && len(c.EnvTemplates) < 1 {
-			return fmt.Errorf("enabling the cache requires at least 1 template or 1 listener to be defined")
+			return errors.New("enabling the cache requires at least 1 template or 1 listener to be defined")
 		}
 
 		if c.Cache.UseAutoAuthToken {
 			if c.AutoAuth == nil {
-				return fmt.Errorf("cache.use_auto_auth_token is true but auto_auth not configured")
+				return errors.New("cache.use_auto_auth_token is true but auto_auth not configured")
 			}
 			if c.AutoAuth != nil && c.AutoAuth.Method != nil && c.AutoAuth.Method.WrapTTL > 0 {
-				return fmt.Errorf("cache.use_auto_auth_token is true and auto_auth uses wrapping")
+				return errors.New("cache.use_auto_auth_token is true and auto_auth uses wrapping")
 			}
 		}
 	}
 
 	if c.APIProxy != nil {
 		if len(c.Listeners) < 1 {
-			return fmt.Errorf("configuring the api_proxy requires at least 1 listener to be defined")
+			return errors.New("configuring the api_proxy requires at least 1 listener to be defined")
 		}
 
 		if c.APIProxy.UseAutoAuthToken {
 			if c.AutoAuth == nil {
-				return fmt.Errorf("api_proxy.use_auto_auth_token is true but auto_auth not configured")
+				return errors.New("api_proxy.use_auto_auth_token is true but auto_auth not configured")
 			}
 			if c.AutoAuth != nil && c.AutoAuth.Method != nil && c.AutoAuth.Method.WrapTTL > 0 {
-				return fmt.Errorf("api_proxy.use_auto_auth_token is true and auto_auth uses wrapping")
+				return errors.New("api_proxy.use_auto_auth_token is true and auto_auth uses wrapping")
 			}
 		}
 	}
@@ -337,12 +338,12 @@ func (c *Config) ValidateConfig() error {
 			(c.APIProxy == nil || !c.APIProxy.UseAutoAuthToken) &&
 			len(c.Templates) == 0 &&
 			len(c.EnvTemplates) == 0 {
-			return fmt.Errorf("auto_auth requires at least one sink or at least one template or api_proxy.use_auto_auth_token=true")
+			return errors.New("auto_auth requires at least one sink or at least one template or api_proxy.use_auto_auth_token=true")
 		}
 	}
 
 	if c.AutoAuth == nil && c.Cache == nil && len(c.Listeners) == 0 {
-		return fmt.Errorf("no auto_auth, cache, or listener block found in config")
+		return errors.New("no auto_auth, cache, or listener block found in config")
 	}
 
 	return c.validateEnvTemplateConfig()
@@ -355,23 +356,23 @@ func (c *Config) validateEnvTemplateConfig() error {
 	}
 
 	if c.Exec == nil {
-		return fmt.Errorf("a top-level 'exec' element must be specified with 'env_template' entries")
+		return errors.New("a top-level 'exec' element must be specified with 'env_template' entries")
 	}
 
 	if len(c.EnvTemplates) == 0 {
-		return fmt.Errorf("must specify at least one 'env_template' element with a top-level 'exec' element")
+		return errors.New("must specify at least one 'env_template' element with a top-level 'exec' element")
 	}
 
 	if c.APIProxy != nil {
-		return fmt.Errorf("'api_proxy' cannot be specified with 'env_template' entries")
+		return errors.New("'api_proxy' cannot be specified with 'env_template' entries")
 	}
 
 	if len(c.Templates) > 0 {
-		return fmt.Errorf("'template' cannot be specified with 'env_template' entries")
+		return errors.New("'template' cannot be specified with 'env_template' entries")
 	}
 
 	if len(c.Exec.Command) == 0 {
-		return fmt.Errorf("'exec' requires a non-empty 'command' field")
+		return errors.New("'exec' requires a non-empty 'command' field")
 	}
 
 	if !slices.Contains([]string{"always", "never"}, c.Exec.RestartOnSecretChanges) {
@@ -393,7 +394,7 @@ func (c *Config) validateEnvTemplateConfig() error {
 		//   - function_denylist / function_blacklist
 
 		if template.MapToEnvironmentVariable == nil {
-			return fmt.Errorf("env_template: an environment variable name is required")
+			return errors.New("env_template: an environment variable name is required")
 		}
 
 		key := *template.MapToEnvironmentVariable
@@ -564,7 +565,7 @@ func LoadConfigFile(path string) (*Config, error) {
 	}
 
 	if fi.IsDir() {
-		return nil, fmt.Errorf("location is a directory, not a file")
+		return nil, errors.New("location is a directory, not a file")
 	}
 
 	// Read the file
@@ -607,7 +608,7 @@ func LoadConfigFile(path string) (*Config, error) {
 
 	list, ok := obj.Node.(*ast.ObjectList)
 	if !ok {
-		return nil, fmt.Errorf("error parsing: file doesn't contain a root object")
+		return nil, errors.New("error parsing: file doesn't contain a root object")
 	}
 
 	if err := parseAutoAuth(result, list); err != nil {
@@ -938,7 +939,7 @@ func parseAutoAuth(result *Config, list *ast.ObjectList) error {
 		return fmt.Errorf("error parsing 'method': %w", err)
 	}
 	if a.Method == nil {
-		return fmt.Errorf("no 'method' block found")
+		return errors.New("no 'method' block found")
 	}
 
 	if err := parseSinks(result, subList); err != nil {
@@ -947,11 +948,11 @@ func parseAutoAuth(result *Config, list *ast.ObjectList) error {
 
 	if result.AutoAuth.Method.WrapTTL > 0 {
 		if len(result.AutoAuth.Sinks) != 1 {
-			return fmt.Errorf("error parsing auto_auth: wrapping enabled on auth method and 0 or many sinks defined")
+			return errors.New("error parsing auto_auth: wrapping enabled on auth method and 0 or many sinks defined")
 		}
 
 		if result.AutoAuth.Sinks[0].WrapTTL > 0 {
-			return fmt.Errorf("error parsing auto_auth: wrapping enabled both on auth method and sink")
+			return errors.New("error parsing auto_auth: wrapping enabled both on auth method and sink")
 		}
 	}
 
@@ -1167,7 +1168,7 @@ func parseTemplates(result *Config, list *ast.ObjectList) error {
 			DecodeHook: mapstructure.ComposeDecodeHookFunc(
 				ctconfig.StringToFileModeFunc(),
 				ctconfig.StringToWaitDurationHookFunc(),
-				mapstructure.StringToSliceHookFunc(","),
+				framework.LegacyStringToSliceHookFunc(","),
 				mapstructure.StringToTimeDurationHookFunc(),
 			),
 			ErrorUnused: true,
@@ -1215,7 +1216,7 @@ func parseExec(result *Config, list *ast.ObjectList) error {
 		DecodeHook: mapstructure.ComposeDecodeHookFunc(
 			ctconfig.StringToFileModeFunc(),
 			ctconfig.StringToWaitDurationHookFunc(),
-			mapstructure.StringToSliceHookFunc(","),
+			framework.LegacyStringToSliceHookFunc(","),
 			mapstructure.StringToTimeDurationHookFunc(),
 			ctsignals.StringToSignalFunc(),
 		),
@@ -1272,7 +1273,7 @@ func parseEnvTemplates(result *Config, list *ast.ObjectList) error {
 			DecodeHook: mapstructure.ComposeDecodeHookFunc(
 				ctconfig.StringToFileModeFunc(),
 				ctconfig.StringToWaitDurationHookFunc(),
-				mapstructure.StringToSliceHookFunc(","),
+				framework.LegacyStringToSliceHookFunc(","),
 				mapstructure.StringToTimeDurationHookFunc(),
 				ctsignals.StringToSignalFunc(),
 			),

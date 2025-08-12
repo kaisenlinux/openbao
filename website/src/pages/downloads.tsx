@@ -24,6 +24,9 @@ const OptionsProvider = ({ children }) => {
         // Function to fetch options from API
         const fetchOptions = async () => {
             try {
+                const url = new URL(location);
+                var version = url.searchParams.get("version");
+
                 // Check if options are cached in localStorage and not expired
                 const cachedOptions = localStorage.getItem("gh-releases");
                 if (cachedOptions) {
@@ -31,13 +34,21 @@ const OptionsProvider = ({ children }) => {
                     if (new Date().getTime() - timestamp < 600000) {
                         setOptions(data);
                         const versions = Object.keys(data);
-                        // Auto-select the first option
+
+                        // Prefer version from the query string, if present.
+                        if (version !== "" && versions.includes(version)) {
+                            setSelectedItem(version);
+                            return;
+                        }
+
+                        // Auto-select the first option otherwise.
                         if (versions.length > 0) {
                             setSelectedItem(versions[0]);
+                            return;
                         }
-                        return;
                     }
                 }
+
                 const response = await fetch(
                     "https://api.github.com/repos/openbao/openbao/releases",
                 );
@@ -56,7 +67,13 @@ const OptionsProvider = ({ children }) => {
                     }),
                 );
 
-                // Auto-select the first option
+                // Prefer version from the query string, if present.
+                if (version !== "" && versions.includes(version)) {
+                    setSelectedItem(version);
+                    return;
+                }
+
+                // Auto-select the first option.
                 if (versions.length > 0) {
                     setSelectedItem(versions[0]);
                 }
@@ -84,7 +101,12 @@ const VersionSelect = () => {
     const { options, selectedItem, setSelectedItem } = useOptions();
 
     const handleSelectChange = (event) => {
-        setSelectedItem(event.target.value);
+        let version = event.target.value;
+        setSelectedItem(version);
+
+        const url = new URL(location);
+        url.searchParams.set("version", version);
+        history.replaceState({}, "", url);
     };
 
     return (
@@ -182,30 +204,45 @@ const Docker = ({ version, name }) => {
     return (
         <Tabs>
             <TabItem value="quay" label="quay.io">
+                <p>Alpine Image Distribution</p>
                 <CodeBlock language="shell">
                     {`docker pull quay.io/openbao/openbao:${version.slice(1)}`}
                 </CodeBlock>
-                <p>or</p>
+                <p>Red Hat Universal Base Image (UBI) Distribution</p>
                 <CodeBlock language="shell">
                     {`docker pull quay.io/openbao/openbao-ubi:${version.slice(1)}`}
                 </CodeBlock>
+                <p>HSM Distribution</p>
+                <CodeBlock language="shell">
+                    {`docker pull quay.io/openbao/openbao-hsm-ubi:${version.slice(1)}`}
+                </CodeBlock>
             </TabItem>
             <TabItem value="ghcr" label="ghcr.io">
+                <p>Alpine Image Distribution</p>
                 <CodeBlock language="shell">
                     {`docker pull ghcr.io/openbao/openbao:${version.slice(1)}`}
                 </CodeBlock>
-                <p>or</p>
+                <p>Red Hat Universal Base Image (UBI) Distribution</p>
                 <CodeBlock language="shell">
                     {`docker pull ghcr.io/openbao/openbao-ubi:${version.slice(1)}`}
                 </CodeBlock>
+                <p>HSM Distribution</p>
+                <CodeBlock language="shell">
+                    {`docker pull ghcr.io/openbao/openbao-hsm-ubi:${version.slice(1)}`}
+                </CodeBlock>
             </TabItem>
             <TabItem value="docker" label="docker.io">
+                <p>Alpine Image Distribution</p>
                 <CodeBlock language="shell">
                     {`docker pull docker.io/openbao/openbao:${version.slice(1)}`}
                 </CodeBlock>
-                <p>or</p>
+                <p>Red Hat Universal Base Image (UBI) Distribution</p>
                 <CodeBlock language="shell">
                     {`docker pull docker.io/openbao/openbao-ubi:${version.slice(1)}`}
+                </CodeBlock>
+                <p>HSM Distribution</p>
+                <CodeBlock language="shell">
+                    {`docker pull docker.io/openbao/openbao-hsm-ubi:${version.slice(1)}`}
                 </CodeBlock>
             </TabItem>
         </Tabs>
@@ -305,11 +342,23 @@ const OS = ({ name }) => {
 const DownloadComponent = () => {
     const { options, selectedItem } = useOptions();
     var version = "";
-    if (selectedItem === undefined && options) {
+    if (selectedItem === "" && options) {
         version = Object.keys(options)[0];
     } else {
         version = selectedItem;
     }
+
+    var prerelease_notice = null;
+    if (version && options[version]["assets"] !== undefined) {
+        if (version.includes("alpha") || version.includes("beta")) {
+            prerelease_notice = <div class="alert alert--danger" role="alert">
+                <h3>Warning</h3>
+
+                This is an <strong>unstable</strong>, prerelease build! Use at your own caution.
+            </div>;
+        }
+    }
+
     return (
         <div className="container margin-vert--lg all-downloads">
             <div className="row">
@@ -342,6 +391,7 @@ const DownloadComponent = () => {
                     </p>
                 </div>
             </div>
+            { prerelease_notice }
             {/* Check if version is not undefined before accessing releases */}
             {version &&
                 options[version]["assets"] &&
